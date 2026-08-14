@@ -2,7 +2,7 @@
   "name": "plugin-ui",
   "version": "0.0.0",
   "private": true,
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "sideEffects": false,
   "main": "./src/index.tsx",
   "types": "./src/index.tsx",

@@ -142,7 +142,9 @@ export const TailwindSettings: React.FC<TailwindSettingsProps> = ({
             helpText="Paste your tailwind custom font family JSON config"
           />
           <div className="text-[11px] text-muted-foreground mt-1">
-            <span>Override custom font handling e.g. &quot;font-comic&quot;</span>
+            <span>
+              Override custom font handling e.g. &quot;font-comic&quot;
+            </span>
             <pre className="mt-1 p-2 bg-muted/60 rounded-md border border-border/80 font-mono text-[10px] text-foreground/80 overflow-x-auto">
               {`{
   "sans": ["Inter", "sans-serif"],

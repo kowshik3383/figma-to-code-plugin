@@ -172,7 +172,10 @@ const CodePanel = (props: CodePanelProps) => {
       </div>
 
       {projectDownloadError && (
-        <p className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-2" role="alert">
+        <p
+          className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-2"
+          role="alert"
+        >
           {projectDownloadError}
         </p>
       )}
@@ -217,7 +220,13 @@ const CodePanel = (props: CodePanelProps) => {
           {/* Styling preferences with custom prefix for Tailwind */}
           {(stylingPreferences.length > 0 ||
             selectedFramework === "Tailwind") && (
-            <div className={hasSettingsBeforeStyling ? "mt-2 pt-2 border-t border-border/60" : undefined}>
+            <div
+              className={
+                hasSettingsBeforeStyling
+                  ? "mt-2 pt-2 border-t border-border/60"
+                  : undefined
+              }
+            >
               <SettingsGroup
                 title="Styling Options"
                 settings={stylingPreferences}
@@ -227,7 +236,9 @@ const CodePanel = (props: CodePanelProps) => {
               >
                 <CustomImagePathInput
                   initialValue={settings?.customImagePath ?? "images/"}
-                  onValueChange={(val) => onPreferenceChanged("customImagePath", val)}
+                  onValueChange={(val) =>
+                    onPreferenceChanged("customImagePath", val)
+                  }
                 />
                 {selectedFramework === "Tailwind" && (
                   <TailwindSettings

@@ -104,7 +104,11 @@ const DownloadMenu = ({
           <Download className="h-3.5 w-3.5" />
         )}
       </PopoverTrigger>
-      <PopoverContent side="bottom" align="end" className="w-36 gap-1 p-1 bg-card border border-border shadow-md rounded-lg">
+      <PopoverContent
+        side="bottom"
+        align="end"
+        className="w-36 gap-1 p-1 bg-card border border-border shadow-md rounded-lg"
+      >
         <PopoverHeader className="px-2 py-1 border-b border-border/60">
           <PopoverTitle className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
             Download Project

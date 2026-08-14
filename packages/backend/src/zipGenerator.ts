@@ -31,7 +31,6 @@ const GENERATED_PROJECT_VERSIONS = {
   viteReact: "^6.0.5",
 } as const;
 
-
 const toPackageName = (rootName: string) =>
   (rootName || "figma-export")
     .toLowerCase()

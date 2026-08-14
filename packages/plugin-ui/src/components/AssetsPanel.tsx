@@ -3,11 +3,9 @@ import {
   Download,
   Image as ImageIcon,
   FileCode,
-  Check,
   CheckSquare,
   Square,
   Layers,
-  Sparkles,
   Archive,
 } from "lucide-react";
 import { DetectedAsset } from "types";
@@ -37,7 +35,9 @@ export const AssetsPanel: React.FC<AssetsPanelProps> = ({
 }) => {
   const [filter, setFilter] = useState<"all" | "image" | "svg">("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [assetScales, setAssetScales] = useState<Record<string, ScaleOption>>({});
+  const [assetScales, setAssetScales] = useState<Record<string, ScaleOption>>(
+    {},
+  );
   const [globalScale, setGlobalScale] = useState<ScaleOption>(1);
   const [isExporting, setIsExporting] = useState(false);
   const [exportingAssetId, setExportingAssetId] = useState<string | null>(null);
@@ -162,7 +162,8 @@ export const AssetsPanel: React.FC<AssetsPanelProps> = ({
         <Layers className="w-5 h-5 mx-auto mb-1.5 opacity-40 text-foreground" />
         <p className="font-semibold text-foreground">No Assets Detected</p>
         <p className="text-[11px] mt-0.5 text-muted-foreground">
-          Select layers containing images or vector icons in Figma to export them.
+          Select layers containing images or vector icons in Figma to export
+          them.
         </p>
       </div>
     );

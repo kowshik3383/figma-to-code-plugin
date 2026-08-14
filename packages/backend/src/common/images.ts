@@ -56,7 +56,8 @@ export const getImageSrc = async (
   },
 ): Promise<string> => {
   const altNode = node as AltNode<ExportableNode>;
-  const hasChildren = "children" in node && (node.children as any[])?.length > 0;
+  const hasChildren =
+    "children" in node && (node.children as any[])?.length > 0;
 
   if (settings.imagePlaceholderMode === "asset" && node.id) {
     return `__FIGMA_IMAGE_${encodeURIComponent(node.id)}__`;
@@ -125,8 +126,7 @@ export const nodeHasImageFill = (
 
 export const nodeHasMultipleFills = (
   node?: NodeWithFills | MinimalFillsMixin | SceneNode | null,
-): boolean =>
-  Array.isArray(node?.fills) && (node?.fills?.length ?? 0) > 1;
+): boolean => Array.isArray(node?.fills) && (node?.fills?.length ?? 0) > 1;
 
 const imageBytesToBase64 = (bytes: Uint8Array): string => {
   // Convert Uint8Array to binary string

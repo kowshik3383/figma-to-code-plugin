@@ -25,7 +25,8 @@ const GradientsPanel = (props: {
           Gradients
         </h3>
         <span className="text-[10px] font-medium bg-muted px-2 py-0.5 rounded-full text-muted-foreground border border-border/60">
-          {props.gradients.length} gradient{props.gradients.length > 1 ? "s" : ""}
+          {props.gradients.length} gradient
+          {props.gradients.length > 1 ? "s" : ""}
         </span>
       </div>
 

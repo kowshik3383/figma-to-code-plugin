@@ -3,12 +3,7 @@ import { HtmlTextBuilder } from "./htmlTextBuilder";
 import { HtmlDefaultBuilder } from "./htmlDefaultBuilder";
 import { htmlAutoLayoutProps } from "./builderImpl/htmlAutoLayout";
 import { formatWithJSX } from "../common/parseJSX";
-import {
-  PluginSettings,
-  HTMLPreview,
-  AltNode,
-  HTMLSettings,
-} from "types";
+import { PluginSettings, HTMLPreview, AltNode, HTMLSettings } from "types";
 import { renderAndAttachSVG } from "../altNodes/altNodeUtils";
 import { getVisibleNodes } from "../common/nodeVisibility";
 import {
@@ -626,7 +621,11 @@ const htmlContainer = async (
       if (hasChildren) {
         builder.addStyles(
           formatWithJSX("background-image", isJSX, `url(${imgUrl})`),
-          formatWithJSX("background-size", isJSX, scaleMode === "FIT" ? "contain" : "cover"),
+          formatWithJSX(
+            "background-size",
+            isJSX,
+            scaleMode === "FIT" ? "contain" : "cover",
+          ),
           formatWithJSX("background-position", isJSX, "center"),
           formatWithJSX("background-repeat", isJSX, "no-repeat"),
         );
@@ -635,7 +634,11 @@ const htmlContainer = async (
         const cleanAlt = (node.name || "image").replace(/"/g, "&quot;");
         src = ` src="${imgUrl}" alt="${cleanAlt}"`;
         builder.addStyles(
-          formatWithJSX("object-fit", isJSX, scaleMode === "FIT" ? "contain" : "cover"),
+          formatWithJSX(
+            "object-fit",
+            isJSX,
+            scaleMode === "FIT" ? "contain" : "cover",
+          ),
         );
       }
     }

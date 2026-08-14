@@ -1,6 +1,26 @@
 {
-  "name": "figma-to-code",
+  "name": "figma-to-code-plugin",
+  "version": "1.0.0",
   "private": true,
+  "description": "A Figma plugin that generates production-ready code from your designs: HTML, Tailwind, React, Svelte, and Styled Components.",
+  "keywords": [
+    "codegen",
+    "figma",
+    "figma-plugin",
+    "html",
+    "react",
+    "svelte",
+    "tailwind"
+  ],
+  "homepage": "https://github.com/kowshik3383/figma-to-code-plugin",
+  "bugs": {
+    "url": "https://github.com/kowshik3383/figma-to-code-plugin/issues"
+  },
+  "license": "GPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kowshik3383/figma-to-code-plugin.git"
+  },
   "scripts": {
     "build": "turbo run build",
     "build:watch": "turbo run build:watch",
@@ -17,13 +37,13 @@
     "turbo": "^2.10.8",
     "typescript": "^7.0.2"
   },
-  "engines": {
-    "node": "24.x"
-  },
   "devEngines": {
     "packageManager": {
       "name": "pnpm",
       "version": "^11.0.0"
     }
+  },
+  "engines": {
+    "node": "24.x"
   }
 }

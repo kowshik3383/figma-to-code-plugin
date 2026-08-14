@@ -1,0 +1,73 @@
+name: Bug Report
+description: Report an issue or bug in Figma to Code
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue! Please provide as much detail as possible to help us reproduce and resolve the problem.
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the Bug
+      description: A clear and concise description of what the bug is.
+      placeholder: When selecting a frame with autolayout and exporting to Tailwind JSX...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Create a frame with ...
+        2. Open Figma to Code plugin
+        3. Select language 'Tailwind (JSX)'
+        4. See error / unexpected output
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear description of what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: selection-json
+    attributes:
+      label: Debug Selection JSON (Optional but highly recommended)
+      description: Open the plugin's **About** tab and click **Copy Selection JSON**, then paste it below.
+      render: json
+    validations:
+      required: false
+  - type: dropdown
+    id: framework
+    attributes:
+      label: Target Framework / Language
+      options:
+        - HTML / CSS
+        - Tailwind CSS
+        - React (JSX)
+        - Tailwind (JSX)
+        - Svelte
+        - Styled Components
+        - Other / General Plugin UI
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Figma Desktop App version, OS (macOS/Windows/Linux), browser (if applicable).
+      placeholder: macOS 14.5, Figma Desktop v124.0.0
+    validations:
+      required: false
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context / Screenshots
+      description: Add any other context, screenshots, or logs here.
+    validations:
+      required: false

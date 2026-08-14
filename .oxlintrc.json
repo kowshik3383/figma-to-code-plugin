@@ -10,7 +10,6 @@
     "oxc",
     "react",
     "jsx-a11y",
-    "nextjs",
     "vitest"
   ],
   "options": {
@@ -30,9 +29,6 @@
     "unicorn/require-post-message-target-origin": "off"
   },
   "settings": {
-    "next": {
-      "rootDir": ["apps/web/"]
-    },
     "react": {
       "version": "19.2"
     }

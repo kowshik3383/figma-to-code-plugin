@@ -247,11 +247,15 @@ const FormField = React.memo(
           {helpText && (
             <Tooltip>
               <TooltipTrigger
-                render={<span className="inline-flex cursor-help opacity-70 hover:opacity-100" />}
+                render={
+                  <span className="inline-flex cursor-help opacity-70 hover:opacity-100" />
+                }
               >
                 <HelpCircle className="w-3 h-3 text-muted-foreground" />
               </TooltipTrigger>
-              <TooltipContent className="text-xs max-w-xs">{helpText}</TooltipContent>
+              <TooltipContent className="text-xs max-w-xs">
+                {helpText}
+              </TooltipContent>
             </Tooltip>
           )}
 
@@ -317,7 +321,9 @@ const FormField = React.memo(
             </div>
 
             {hasError && (
-              <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">{errorMessage}</p>
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
+                {errorMessage}
+              </p>
             )}
           </div>
 

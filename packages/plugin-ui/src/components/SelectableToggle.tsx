@@ -52,7 +52,9 @@ const SelectableToggle = ({
           <span
             className={cn(
               "text-xs whitespace-nowrap",
-              isSelected ? "text-foreground font-medium" : "text-muted-foreground",
+              isSelected
+                ? "text-foreground font-medium"
+                : "text-muted-foreground",
             )}
           >
             {title}
@@ -68,7 +70,9 @@ const SelectableToggle = ({
               >
                 <HelpCircle size={11} />
               </TooltipTrigger>
-              <TooltipContent className="text-xs max-w-xs">{description}</TooltipContent>
+              <TooltipContent className="text-xs max-w-xs">
+                {description}
+              </TooltipContent>
             </Tooltip>
           )}
         </div>

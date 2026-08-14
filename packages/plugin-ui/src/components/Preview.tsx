@@ -55,7 +55,11 @@ const Preview: React.FC<{
             aria-label={`Switch preview to ${bgColor === "white" ? "black" : "white"} background`}
             title={`Switch preview to ${bgColor === "white" ? "black" : "white"} background`}
           >
-            <Circle size={13} fill={bgColor === "white" ? "#ffffff" : "#1b1b1b"} className="stroke-foreground/40" />
+            <Circle
+              size={13}
+              fill={bgColor === "white" ? "#ffffff" : "#1b1b1b"}
+              className="stroke-foreground/40"
+            />
           </Button>
 
           {/* Expand/Collapse Button */}
@@ -142,7 +146,8 @@ const Preview: React.FC<{
       {/* Footer with size info */}
       <div className="px-3 py-1.5 text-[11px] font-mono text-muted-foreground flex items-center justify-between border-t border-border bg-card/30">
         <span>
-          {htmlPreview.size.width.toFixed(0)} × {htmlPreview.size.height.toFixed(0)} px
+          {htmlPreview.size.width.toFixed(0)} ×{" "}
+          {htmlPreview.size.height.toFixed(0)} px
         </span>
         <span className="text-[10px] text-muted-foreground/70">
           Scale {(scaleFactor * 100).toFixed(0)}%

@@ -212,7 +212,6 @@ export interface TailwindTextConversion {
 
 export type TailwindColorType = "text" | "bg" | "border" | "outline";
 
-
 // UI
 
 export interface PreferenceOptions {

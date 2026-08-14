@@ -94,7 +94,9 @@ function hasSvgExportSettings(node: SceneNode): boolean {
  * Returns an object indicating if disallowed children were found
  * and if any valid icon content (vector/primitive) was found.
  */
-function checkChildrenRecursively(children: ReadonlyArray<SceneNode | NodeWithFills>): {
+function checkChildrenRecursively(
+  children: ReadonlyArray<SceneNode | NodeWithFills>,
+): {
   hasDisallowedChild: boolean;
   hasValidContent: boolean;
 } {
@@ -179,8 +181,7 @@ export function isLikelyIcon(
   else if (hasSvgExportSettings(node as SceneNode)) {
     reason = "Has SVG export settings";
     result = true;
-  }
-  else if (isIconName && isTypicalIconSize(node as SceneNode)) {
+  } else if (isIconName && isTypicalIconSize(node as SceneNode)) {
     reason = "Matched icon/tick/star layer name and size constraint";
     result = true;
   }

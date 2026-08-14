@@ -288,7 +288,9 @@ describe("HTML and Tailwind code generation for images", () => {
       htmlGenerationMode: "html",
     });
 
-    expect(htmlOutput.html).toContain("background-image: url(images/banner-card-20-30.png)");
+    expect(htmlOutput.html).toContain(
+      "background-image: url(images/banner-card-20-30.png)",
+    );
     expect(htmlOutput.html).not.toContain("<img");
 
     const tailwindOutput = await tailwindMain([containerWithChild], {
@@ -360,6 +362,8 @@ describe("HTML and Tailwind code generation for images", () => {
     });
 
     expect(htmlOutput.html).toContain('src="assets/icons/star-icon-50-60.svg"');
-    expect(htmlOutput.html).toContain('src="assets/icons/hero-photo-10-20.png"');
+    expect(htmlOutput.html).toContain(
+      'src="assets/icons/hero-photo-10-20.png"',
+    );
   });
 });

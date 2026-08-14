@@ -25,7 +25,6 @@ import Loading from "./components/Loading";
 import { useEffect, useState } from "react";
 import { InfoIcon } from "lucide-react";
 import React from "react";
-import { Button } from "./components/ui/button";
 import { ScrollArea } from "./components/ui/scroll-area";
 import { TooltipProvider } from "./components/ui/tooltip";
 

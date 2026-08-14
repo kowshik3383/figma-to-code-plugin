@@ -68,7 +68,9 @@ export const CustomImagePathInput: React.FC<CustomImagePathInputProps> = ({
     fileInputRef.current?.click();
   };
 
-  const handleFolderInputFallback = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFolderInputFallback = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       const firstFile = files[0];
@@ -96,8 +98,8 @@ export const CustomImagePathInput: React.FC<CustomImagePathInputProps> = ({
         webkitdirectory="true"
         directory="true"
         multiple
+        tabIndex={-1}
         className="hidden"
-        aria-hidden="true"
       />
 
       <div className="flex items-center justify-between">
@@ -117,7 +119,8 @@ export const CustomImagePathInput: React.FC<CustomImagePathInputProps> = ({
             }
           />
           <TooltipContent className="text-xs max-w-xs">
-            Path prefix used in generated &lt;img src=&quot;...&quot;&gt; tags and project export (e.g., &quot;images/&quot;, &quot;assets/&quot;).
+            Path prefix used in generated &lt;img src=&quot;...&quot;&gt; tags
+            and project export (e.g., &quot;images/&quot;, &quot;assets/&quot;).
           </TooltipContent>
         </Tooltip>
       </div>

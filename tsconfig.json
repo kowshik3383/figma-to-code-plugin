@@ -4,8 +4,7 @@
     { "path": "./packages/types" },
     { "path": "./packages/backend" },
     { "path": "./packages/plugin-ui" },
-    { "path": "./apps/plugin" },
-    { "path": "./apps/web" }
+    { "path": "./apps/plugin" }
   ],
   "exclude": ["./../node_modules"]
 }

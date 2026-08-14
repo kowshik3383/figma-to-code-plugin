@@ -148,7 +148,9 @@ const WarningsPanel: React.FC<WarningsPanelProps> = ({ warnings }) => {
                       {/* Suggested fix */}
                       {isCritical && (
                         <div className="mt-1.5 bg-background/80 rounded-md py-1 px-2 text-muted-foreground border border-red-500/20 text-[11px] leading-relaxed">
-                          <span className="font-semibold text-foreground">Tip: </span>
+                          <span className="font-semibold text-foreground">
+                            Tip:{" "}
+                          </span>
                           {suggestFixForWarning(message.toString())}
                         </div>
                       )}
@@ -199,9 +201,9 @@ const shouldShowActionButtons = (warning: string): boolean => {
 const getDocsLinkForWarning = (warning: string): string => {
   // Example URLs - in reality you would point to specific documentation pages
   if (warning.toLowerCase().includes("unsupported")) {
-    return "https://github.com/bernaferrari/figma-to-code/wiki/Supported-Elements";
+    return "https://github.com/kowshik3383/figma-to-code-plugin/blob/main/docs/SUPPORTED-ELEMENTS.md";
   }
-  return "https://github.com/bernaferrari/figma-to-code/wiki";
+  return "https://github.com/kowshik3383/figma-to-code-plugin/blob/main/docs";
 };
 
 export default WarningsPanel;

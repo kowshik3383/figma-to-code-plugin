@@ -1,0 +1,174 @@
+@import "tailwindcss";
+
+@source '../../../packages/plugin-ui/**/*.{js,ts,jsx,tsx}';
+
+@custom-variant dark (&:is(.dark *));
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+:root {
+  --radius: 0.5rem;
+  --background: #fffafa;
+  --foreground: #1b1b1b;
+  --card: #ffffff;
+  --card-foreground: #1b1b1b;
+  --popover: #ffffff;
+  --popover-foreground: #1b1b1b;
+  --primary: #1b1b1b;
+  --primary-foreground: #fffafa;
+  --secondary: #f4eee9;
+  --secondary-foreground: #1b1b1b;
+  --muted: #f2ece8;
+  --muted-foreground: #65605d;
+  --accent: #ede6e2;
+  --accent-foreground: #1b1b1b;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: #e8e2de;
+  --input: #e4deda;
+  --ring: #1b1b1b;
+  --chart-1: oklch(0.68 0.29 41.48);
+  --chart-2: oklch(0.48 0.23 154.44);
+  --chart-3: oklch(0.27 0.13 244.46);
+  --chart-4: oklch(0.72 0.31 81.39);
+  --chart-5: oklch(0.74 0.36 50.3);
+}
+
+.dark {
+  --background: #141414;
+  --foreground: #f4f2f0;
+  --card: #1b1b1b;
+  --card-foreground: #f4f2f0;
+  --popover: #1b1b1b;
+  --popover-foreground: #f4f2f0;
+  --primary: #f4f2f0;
+  --primary-foreground: #141414;
+  --secondary: #252322;
+  --secondary-foreground: #f4f2f0;
+  --muted: #232120;
+  --muted-foreground: #9e9794;
+  --accent: #2a2827;
+  --accent-foreground: #f4f2f0;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: #2e2c2b;
+  --input: #353331;
+  --ring: #f4f2f0;
+  --chart-1: oklch(0.55 0.28 262.73);
+  --chart-2: oklch(0.51 0.24 150.67);
+  --chart-3: oklch(0.43 0.33 48.41);
+  --chart-4: oklch(0.61 0.26 300.96);
+  --chart-5: oklch(0.58 0.38 320.79);
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --animate-accordion-down: accordion-down 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-accordion-up: accordion-up 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+      opacity: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+      opacity: 1;
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+      opacity: 1;
+    }
+    to {
+      height: 0;
+      opacity: 0;
+    }
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: rgba(27, 27, 27, 0.15);
+  }
+  .dark * {
+    outline-color: rgba(244, 242, 240, 0.2);
+  }
+  button:not([disabled]),
+  [role="button"]:not([disabled]) {
+    cursor: pointer;
+  }
+}
+
+/* Custom scrollbar for flawless clean feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(27, 27, 27, 0.15);
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(27, 27, 27, 0.28);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

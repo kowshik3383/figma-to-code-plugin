@@ -1,7 +1,7 @@
 # Figma to Code
 
 <p align="center">
-  <img src="assets/icon_768.png" alt="Figma to Code Icon" width="120" height="120" />
+  <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSF25IajrDZvPpPOza_7OXeStXGfYnKu1kNyIkZNYxmIFx_hKrtXiqoouIr&s=10" alt="Figma to Code Icon" width="120" height="120" />
 </p>
 
 <p align="center">

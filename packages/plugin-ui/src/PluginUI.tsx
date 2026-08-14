@@ -16,6 +16,7 @@ import {
   SolidColorConversion,
   Warning,
   DetectedAsset,
+  CompilationMetrics,
 } from "types";
 import {
   preferenceOptions,
@@ -42,6 +43,7 @@ type PluginUIProps = {
   colors: SolidColorConversion[];
   gradients: LinearGradientConversion[];
   assets?: DetectedAsset[];
+  metrics?: CompilationMetrics;
   isLoading: boolean;
   onDownloadProject?: (format: DownloadProjectFormat) => void;
   isDownloadingProject?: boolean;
@@ -183,6 +185,26 @@ export const PluginUI = (props: PluginUIProps) => {
               )}
 
               {warnings.length > 0 && <WarningsPanel warnings={warnings} />}
+
+              {props.metrics && (
+                <div className="flex items-center justify-between w-full px-1 text-[11px] text-muted-foreground">
+                  <div className="flex items-center gap-1.5 bg-muted/60 px-2.5 py-1 rounded-md border border-border/60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span className="font-semibold text-foreground">
+                      ⚡ {props.metrics.totalTimeMs}ms
+                    </span>
+                    <span className="text-muted-foreground/40">•</span>
+                    <span>{props.metrics.nodeCount} nodes</span>
+                    <span className="text-muted-foreground/40">•</span>
+                    <span className="text-emerald-600 dark:text-emerald-400">
+                      100% offline
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-muted-foreground/60 font-mono">
+                    GPL-3.0
+                  </span>
+                </div>
+              )}
 
               <CodePanel
                 code={props.code}

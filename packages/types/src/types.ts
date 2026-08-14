@@ -38,6 +38,13 @@ export interface DetectedAsset {
   previewUrl?: string;
 }
 
+export interface CompilationMetrics {
+  nodeCount: number;
+  parseTimeMs: number;
+  codegenTimeMs: number;
+  totalTimeMs: number;
+}
+
 // Messaging
 export interface ConversionData {
   code: string;
@@ -47,6 +54,7 @@ export interface ConversionData {
   gradients: LinearGradientConversion[];
   warnings: Warning[];
   assets?: DetectedAsset[];
+  metrics?: CompilationMetrics;
 }
 
 export type Warning = string;

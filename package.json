@@ -26,6 +26,7 @@
     "build:watch": "turbo run build:watch",
     "dev": "turbo run dev --concurrency 20",
     "lint": "oxlint .",
+    "typecheck": "tsc --noEmit",
     "test": "turbo run test",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."

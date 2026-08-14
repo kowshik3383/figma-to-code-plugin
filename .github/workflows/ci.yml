@@ -43,6 +43,9 @@ jobs:
       - name: Lint codebase
         run: pnpm lint
 
+      - name: Typecheck TypeScript
+        run: pnpm typecheck
+
       - name: Run unit tests
         run: pnpm test
 

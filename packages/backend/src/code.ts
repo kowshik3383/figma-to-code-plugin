@@ -167,6 +167,9 @@ export const run = async (settings: PluginSettings) => {
   );
 
   const assets = detectAssetsInSelection(convertedSelection || selection);
+  const totalTimeMs = Date.now() - nodeToJSONStart;
+  const parseTimeMs = convertToCodeStart - nodeToJSONStart;
+  const codegenTimeMs = Date.now() - convertToCodeStart;
 
   postConversionComplete({
     code,
@@ -176,6 +179,12 @@ export const run = async (settings: PluginSettings) => {
     settings,
     warnings: [...warnings],
     assets,
+    metrics: {
+      nodeCount,
+      parseTimeMs,
+      codegenTimeMs,
+      totalTimeMs,
+    },
   });
 };
 

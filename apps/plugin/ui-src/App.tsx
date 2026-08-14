@@ -13,8 +13,8 @@ import {
   Warning,
   DownloadProjectFormat,
   ProjectDownloadErrorMessage,
-  ProjectZipMessage,
   DetectedAsset,
+  CompilationMetrics,
 } from "types";
 import { postUISettingsChangingMessage } from "./messaging";
 import copy from "copy-to-clipboard";
@@ -29,6 +29,7 @@ interface AppState {
   gradients: LinearGradientConversion[];
   warnings: Warning[];
   assets: DetectedAsset[];
+  metrics?: CompilationMetrics;
   isDownloadingProject: boolean;
   projectDownloadError: string | null;
 }
@@ -254,6 +255,7 @@ export default function App() {
         colors={state.colors}
         gradients={state.gradients}
         assets={state.assets}
+        metrics={state.metrics}
         onDownloadProject={handleDownloadProject}
         isDownloadingProject={state.isDownloadingProject}
         projectDownloadError={state.projectDownloadError}

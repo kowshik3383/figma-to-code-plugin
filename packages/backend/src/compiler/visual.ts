@@ -51,6 +51,7 @@ export function recoverContainment(nodes: DesignNode[], parent?: DesignNode) {
   for (const node of nodes) recoverContainment(node.children, node);
   if (
     !parent ||
+    parent.visual.maskedStack ||
     parent.layout?.kind === "flex" ||
     parent.layout?.kind === "grid"
   )
@@ -262,6 +263,7 @@ export function inferVisualLayout(nodes: DesignNode[], diagnostics: string[]) {
     inferVisualLayout(node.children, diagnostics);
     if (node.layout?.kind !== "freeform" || !node.children.length) continue;
     if (
+      !node.visual.maskedStack &&
       !node.style.transform &&
       node.children.every(
         (child) =>
@@ -331,4 +333,38 @@ export function resolveOverflow(nodes: DesignNode[], diagnostics: string[]) {
     return node.visual.renderedBounds;
   }
   nodes.forEach(visit);
+}
+
+export function assignStackOrder(nodes: DesignNode[]) {
+  for (const parent of nodes) {
+    assignStackOrder(parent.children);
+    if (parent.children.length < 2) continue;
+    const participants = new Set<DesignNode>();
+    for (const [i, a] of parent.children.entries()) {
+      for (const b of parent.children.slice(i + 1)) {
+        if (
+          overlaps(
+            a.visual.renderedBounds ?? a.visual.bounds,
+            b.visual.renderedBounds ?? b.visual.bounds,
+          )
+        ) {
+          participants.add(a);
+          participants.add(b);
+        }
+      }
+    }
+    if (!participants.size) continue;
+    if (parent.visual.reverseOrder) {
+      for (const child of participants)
+        child.style.zIndex = String(
+          parent.children.length - child.visual.order,
+        );
+    } else {
+      for (const child of participants)
+        child.style.zIndex = String(child.visual.order + 1);
+    }
+    for (const child of participants) child.style.position ??= "relative";
+    if (!parent.children.some((child) => child.style.mixBlendMode))
+      parent.style.isolation = "isolate";
+  }
 }

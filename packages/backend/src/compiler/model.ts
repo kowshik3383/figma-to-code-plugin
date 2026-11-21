@@ -76,6 +76,8 @@ export interface VisualLayer {
     fontFamily: string;
   };
   complex: boolean;
+  maskedStack: boolean;
+  reverseOrder: boolean;
   fills: { kind: string; opacity: number }[];
 }
 

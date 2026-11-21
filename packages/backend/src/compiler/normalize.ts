@@ -1,4 +1,6 @@
+import { applyEffects } from "./effects";
 import {
+  assignStackOrder,
   inferVisualLayout,
   recoverContainment,
   resolveOverflow,
@@ -111,6 +113,15 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
     const visual: VisualLayer = {
       bounds: { ...bounds },
       type: node.type,
+      maskedStack:
+        "children" in node &&
+        node.children.some(
+          (child) => child.visible && "isMask" in child && child.isMask,
+        ),
+      reverseOrder:
+        "layoutMode" in node &&
+        (node.layoutMode === "HORIZONTAL" || node.layoutMode === "VERTICAL") &&
+        node.itemReverseZIndex === true,
       order,
       clips: "clipsContent" in node && node.clipsContent,
       complex:
@@ -220,8 +231,12 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
 
     if (asset?.placement !== "image" && "opacity" in node && node.opacity !== 1)
       style.opacity = String(node.opacity);
-    if ("rotation" in node && node.rotation)
-      style.transform = `rotate(${-node.rotation}deg)`;
+    applyEffects(
+      node,
+      style,
+      document.diagnostics,
+      asset?.placement === "image",
+    );
     if (
       "cornerRadius" in node &&
       typeof node.cornerRadius === "number" &&
@@ -328,8 +343,10 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
     // SVG/PNG leaves are already composited, including boolean-operation children.
     if ("children" in node && asset?.placement !== "image") {
       style.position ??= "relative";
-      if (node.children.some((child) => "isMask" in child && child.isMask))
-        document.diagnostics.push(`Masks on ${node.name} need manual review.`);
+      if (visual.maskedStack)
+        document.diagnostics.push(
+          `Unsupported mask stack on ${node.name} (${node.id}); masked content may extend beyond its original shape.`,
+        );
       if (
         "layoutMode" in node &&
         (node.layoutMode === "HORIZONTAL" || node.layoutMode === "VERTICAL")
@@ -458,5 +475,6 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
   recoverContainment(document.roots);
   inferVisualLayout(document.roots, document.diagnostics);
   resolveOverflow(document.roots, document.diagnostics);
+  assignStackOrder(document.roots);
   return { document, sources };
 }

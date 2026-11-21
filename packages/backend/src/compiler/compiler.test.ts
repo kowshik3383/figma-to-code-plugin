@@ -65,6 +65,7 @@ function fixture() {
     name: "@h2 Heading",
     layoutSizingHorizontal: "FILL",
     width: 300,
+    x: 180,
     height: 28,
     textAutoResize: "HEIGHT",
     textAlignHorizontal: "LEFT",
@@ -515,4 +516,39 @@ it("uses hug sizing and preserves Figma typography without a fixed text height",
   });
   expect(result.style.fontFamily).toContain("monospace");
   expect(result.style.height).toBeUndefined();
+});
+
+it("assigns stacking only where needed and maps rotation, blend, and multiple shadows", () => {
+  const shadow = {
+    visible: true,
+    color: { r: 0, g: 0, b: 0, a: 0.25 },
+    offset: { x: 1, y: 2 },
+    radius: 4,
+    blendMode: "NORMAL",
+  };
+  const lower = layer("lower", { width: 110, height: 50 });
+  const upper = layer("upper", {
+    x: 50,
+    height: 60,
+    rotation: 12,
+    blendMode: "MULTIPLY",
+    effects: [
+      { ...shadow, type: "DROP_SHADOW" },
+      { ...shadow, type: "INNER_SHADOW" },
+    ],
+  });
+  const separate = layer("separate", { x: 300 });
+  const { document } = normalizeSelection([
+    row("root", [lower, upper, separate], { layoutMode: "NONE" }),
+  ]);
+  const [a, b, c] = document.roots[0].children;
+  expect(a.style.zIndex).toBe("1");
+  expect(b.style).toMatchObject({
+    zIndex: "2",
+    transform: "rotate(-12deg)",
+    transformOrigin: "0 0",
+    mixBlendMode: "multiply",
+  });
+  expect(b.style.boxShadow).toMatch(/^inset .*rgba\(0, 0, 0, 0.25\), 1px/);
+  expect(c.style.zIndex).toBeUndefined();
 });

@@ -335,9 +335,9 @@ export function resolveOverflow(nodes: DesignNode[], diagnostics: string[]) {
   nodes.forEach(visit);
 }
 
-export function assignStackOrder(nodes: DesignNode[]) {
+export function assignStackOrder(nodes: DesignNode[], diagnostics: string[]) {
   for (const parent of nodes) {
-    assignStackOrder(parent.children);
+    assignStackOrder(parent.children, diagnostics);
     if (parent.children.length < 2) continue;
     const participants = new Set<DesignNode>();
     for (const [i, a] of parent.children.entries()) {
@@ -354,6 +354,14 @@ export function assignStackOrder(nodes: DesignNode[]) {
       }
     }
     if (!participants.size) continue;
+    diagnostics.push(
+      `Overlapping layers in ${parent.name} (${parent.id}): ${[...participants]
+        .slice(0, 5)
+        .map(({ name, id }) => `${name} (${id})`)
+        .join(
+          ", ",
+        )}${participants.size > 5 ? ` and ${participants.size - 5} more` : ""}. Review stacking and narrow layouts.`,
+    );
     if (parent.visual.reverseOrder) {
       for (const child of participants)
         child.style.zIndex = String(

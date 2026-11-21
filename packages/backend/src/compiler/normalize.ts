@@ -140,6 +140,18 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
             }))
           : [],
     };
+    if (visual.mixed)
+      document.diagnostics.push(
+        `Mixed fills on ${node.name} (${node.id}); review paint and text styling.`,
+      );
+    if (
+      visual.fills.length > 1 &&
+      !visual.fills.some(({ kind }) => kind === "IMAGE")
+    ) {
+      document.diagnostics.push(
+        `Multiple fills on ${node.name} (${node.id}); layered paints may need manual styling.`,
+      );
+    }
     const text = node.type === "TEXT" ? node.characters : undefined;
     const hint = node.name
       .trim()
@@ -468,13 +480,18 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
     };
   }
 
-  for (const [index, root] of visibleSelection(selection).entries()) {
+  const selected = visibleSelection(selection);
+  if (selected.some((node) => node.visible && "isMask" in node && node.isMask))
+    document.diagnostics.push(
+      "A selected mask cannot be rendered independently. Select its containing frame to review the masked composition.",
+    );
+  for (const [index, root] of selected.entries()) {
     const normalized = visit(root, undefined, 0, index);
     if (normalized) document.roots.push(normalized);
   }
   recoverContainment(document.roots);
   inferVisualLayout(document.roots, document.diagnostics);
   resolveOverflow(document.roots, document.diagnostics);
-  assignStackOrder(document.roots);
+  assignStackOrder(document.roots, document.diagnostics);
   return { document, sources };
 }

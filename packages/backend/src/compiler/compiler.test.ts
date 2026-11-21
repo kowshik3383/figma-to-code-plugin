@@ -600,3 +600,19 @@ it("replaces a uniform PNG divider with CSS and preserves nonuniform photos and 
   expect(html).toContain("background-color: #3278c8");
   expect(html).not.toContain("divider-divider.png");
 });
+
+it("lists named layers for ambiguous stacking, masks and mixed fills", () => {
+  const mask = layer("mask", { isMask: true });
+  const a = layer("a", { fills: mixed, width: 100 });
+  const b = layer("b", { x: 40, width: 130 });
+  const { document } = normalizeSelection([
+    row("root", [mask, a, b], { layoutMode: "NONE" }),
+  ]);
+  expect(document.diagnostics).toEqual(
+    expect.arrayContaining([
+      expect.stringContaining("Mixed fills on a (a)"),
+      expect.stringContaining("Unsupported mask stack"),
+      expect.stringContaining("Overlapping layers in"),
+    ]),
+  );
+});

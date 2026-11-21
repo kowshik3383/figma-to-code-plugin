@@ -51,6 +51,7 @@ export async function runDesignCompiler(
         settings.outputFormat === "separate-html",
         isCurrent,
         settings.linkGoogleFonts,
+        true,
       )
     : undefined;
   const { urls, renderedIds, colors } =

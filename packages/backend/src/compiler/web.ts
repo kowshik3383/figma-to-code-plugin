@@ -69,14 +69,19 @@ export function webGenerator(
     jsx?: boolean;
     tailwind?: boolean;
     initialDepth?: number;
+    layerMetadata?: boolean;
     classFor?: (node: DesignNode, style: Style) => string;
   } = {},
 ): DesignGenerator {
   const { jsx, tailwind } = options;
 
   function attributes(node: DesignNode, style: Style) {
+    const metadata =
+      options.layerMetadata && !jsx
+        ? ` data-figma-layer="${escapeHTML(node.id)}" data-figma-name="${escapeHTML(node.name)}"`
+        : "";
     if (options.classFor)
-      return ` class="${escapeHTML(options.classFor(node, style))}"`;
+      return ` class="${escapeHTML(options.classFor(node, style))}"${metadata}`;
     const utilities: string[] = [];
     const inline: Style = {};
     for (const [key, value] of Object.entries(style)) {

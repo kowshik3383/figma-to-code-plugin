@@ -89,12 +89,12 @@ exports[`standalone HTML exports > emits valid self-contained HTML for the auto-
   </style>
 </head>
 <body>
-    <div class="figma-feature-page">
-      <article class="figma-feature-page__article-feature-card">
-        <div class="figma-feature-page__feature"></div>
-        <div class="figma-feature-page__feature"></div>
-      </article>
-    </div>
+  <div class="figma-feature-page">
+    <article class="figma-feature-page__article-feature-card">
+      <div class="figma-feature-page__feature"></div>
+      <div class="figma-feature-page__feature"></div>
+    </article>
+  </div>
 </body>
 </html>
 "
@@ -144,9 +144,9 @@ exports[`standalone HTML exports > emits valid self-contained HTML for the overf
   </style>
 </head>
 <body>
-    <div class="figma-overflowing-frame">
-      <div class="figma-overflowing-frame__protruding-tile"></div>
-    </div>
+  <div class="figma-overflowing-frame">
+    <div class="figma-overflowing-frame__protruding-tile"></div>
+  </div>
 </body>
 </html>
 "
@@ -200,10 +200,10 @@ exports[`standalone HTML exports > emits valid self-contained HTML for the simpl
   </style>
 </head>
 <body>
-    <article class="figma-article-feature-card">
-      <div class="figma-article-feature-card__feature"></div>
-      <div class="figma-article-feature-card__feature"></div>
-    </article>
+  <article class="figma-article-feature-card">
+    <div class="figma-article-feature-card__feature"></div>
+    <div class="figma-article-feature-card__feature"></div>
+  </article>
 </body>
 </html>
 "

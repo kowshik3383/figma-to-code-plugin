@@ -11,6 +11,7 @@ export async function prepareHtmlExport(
   separateStyles: boolean,
   isCurrent = () => true,
   linkGoogleFonts = false,
+  includeLayerMetadata = false,
 ) {
   const flatColors = new Map<string, string>();
   const files = await collectProjectAssets(
@@ -35,7 +36,11 @@ export async function prepareHtmlExport(
     return `data:${mime};base64,${fromUint8Array(file.bytes)}`;
   };
   const assetColor = (asset: DesignAsset) => flatColors.get(asset.id);
-  const emitter = new SingleFileHtmlEmitter(new Date(), linkGoogleFonts);
+  const emitter = new SingleFileHtmlEmitter(
+    new Date(),
+    linkGoogleFonts,
+    includeLayerMetadata,
+  );
   const options = {
     assetColor,
     assetUrl: embed

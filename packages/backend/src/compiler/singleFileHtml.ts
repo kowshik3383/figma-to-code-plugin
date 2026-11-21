@@ -58,6 +58,7 @@ export class SingleFileHtmlEmitter {
   constructor(
     private readonly generatedAt = new Date(),
     private readonly linkFonts = false,
+    private readonly includeLayerMetadata = false,
   ) {}
 
   emit(
@@ -74,6 +75,7 @@ export class SingleFileHtmlEmitter {
     const rules: string[] = [];
     const markup = webGenerator({
       initialDepth: 1,
+      layerMetadata: this.includeLayerMetadata,
       classFor: (node, style) => {
         const declarationsText = declarations(style);
         const existing = classes.get(declarationsText);
@@ -118,10 +120,7 @@ export class SingleFileHtmlEmitter {
               .join("\n")}\n  </style>`,
         "</head>",
         "<body>",
-        markup
-          .split("\n")
-          .map((line) => `  ${line}`)
-          .join("\n"),
+        markup,
         "</body>",
         "</html>",
         "",

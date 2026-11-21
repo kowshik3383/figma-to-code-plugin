@@ -144,6 +144,7 @@ const figma = {
   const standalone = messages.filter(({ type }) => type === "code").at(-1);
   assert.equal(standalone.settings.outputFormat, "single-html");
   assert.equal(standalone.htmlPreview.useCode, true);
+  assert.match(standalone.code, /data-figma-layer="1:2"/);
   assert.match(standalone.code, /data:image\/png;base64/);
   await ui.onmessage({ type: "download-project", format: "single-html" });
   const htmlFile = messages

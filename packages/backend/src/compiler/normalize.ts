@@ -2,6 +2,7 @@ import { getImageFills } from "../common/images";
 import { describeAsset, visibleSelection } from "./assets";
 import type {
   Alignment,
+  Bounds,
   DesignDocument,
   DesignLayout,
   DesignNode,
@@ -74,13 +75,49 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
     node: SceneNode,
     parent?: SceneNode,
     depth = 0,
+    order = 0,
+    parentBounds?: Bounds,
   ): DesignNode | undefined {
     if (!node.visible || ("isMask" in node && node.isMask)) return;
     if (sources.size >= 4000 || depth >= 160)
       throw new Error(
         "Selection exceeds the compiler limit (4,000 visible layers or 160 levels of nesting).",
       );
+    if (
+      (node.width <= 0 || node.height <= 0) &&
+      node.type !== "LINE" &&
+      !("children" in node && node.children.length)
+    )
+      return;
     sources.set(node.id, node);
+    const bounds = node.absoluteBoundingBox ?? {
+      x:
+        (parentBounds?.x ?? 0) +
+        node.x -
+        (parent?.type === "GROUP" ? parent.x : 0),
+      y:
+        (parentBounds?.y ?? 0) +
+        node.y -
+        (parent?.type === "GROUP" ? parent.y : 0),
+      width: node.width,
+      height: node.height,
+    };
+    const visual = {
+      bounds: { ...bounds },
+      type: node.type,
+      order,
+      clips: "clipsContent" in node && node.clipsContent,
+      mixed: "fills" in node && typeof node.fills === "symbol",
+      fills:
+        "fills" in node && Array.isArray(node.fills)
+          ? node.fills
+              .filter(activePaint)
+              .map((paint) => ({
+                kind: paint.type,
+                opacity: paint.opacity ?? 1,
+              }))
+          : [],
+    };
     const text = node.type === "TEXT" ? node.characters : undefined;
     const hint = node.name
       .trim()
@@ -271,9 +308,39 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
           `Freeform layout on ${node.name} uses positioned children.`,
         );
       }
-      for (const child of node.children) {
-        const converted = visit(child, node, depth + 1);
+      for (const [index, child] of node.children.entries()) {
+        const converted = visit(child, node, depth + 1, index, bounds);
         if (converted) children.push(converted);
+      }
+    }
+
+    if (
+      node.type === "GROUP" &&
+      !asset &&
+      visual.fills.length === 0 &&
+      node.opacity === 1 &&
+      node.rotation === 0 &&
+      node.effects.length === 0 &&
+      !node.isMask &&
+      node.blendMode === "PASS_THROUGH" &&
+      tag === "div"
+    ) {
+      if (!children.length) return;
+      const child = children[0];
+      if (
+        children.length === 1 &&
+        Object.keys(bounds).every(
+          (key) =>
+            bounds[key as keyof Bounds] ===
+            child.visual.bounds[key as keyof Bounds],
+        )
+      ) {
+        child.visual.order = order;
+        for (const key of ["position", "left", "top"]) {
+          if (style[key]) child.style[key] = style[key];
+          else delete child.style[key];
+        }
+        return child;
       }
     }
 
@@ -301,6 +368,7 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
     }
     if (asset?.placement === "image")
       return {
+        visual,
         id: node.id,
         name: node.name,
         tag,
@@ -311,6 +379,7 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
         children,
       };
     return {
+      visual,
       id: node.id,
       name: node.name,
       tag,
@@ -324,8 +393,8 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
     };
   }
 
-  for (const root of visibleSelection(selection)) {
-    const normalized = visit(root);
+  for (const [index, root] of visibleSelection(selection).entries()) {
+    const normalized = visit(root, undefined, 0, index);
     if (normalized) document.roots.push(normalized);
   }
   return { document, sources };

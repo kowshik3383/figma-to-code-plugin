@@ -50,7 +50,24 @@ export type DesignLayout =
 
 export type GridTrack = { kind: "fixed"; pixels: number } | { kind: "flex" };
 
+export interface Bounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface VisualLayer {
+  bounds: Bounds;
+  type: string;
+  order: number;
+  clips: boolean;
+  mixed: boolean;
+  fills: { kind: string; opacity: number }[];
+}
+
 export interface DesignNode {
+  visual: VisualLayer;
   id: string;
   name: string;
   tag: SemanticTag;

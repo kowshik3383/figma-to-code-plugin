@@ -389,3 +389,31 @@ describe("compiler output contract", () => {
     },
   );
 });
+
+it("captures page geometry and prunes invisible, zero-sized and redundant groups", () => {
+  const paint = layer("paint", {
+    absoluteBoundingBox: { x: 20, y: 30, width: 160, height: 80 },
+    fills: mixed,
+  });
+  const group = row("group", [paint], {
+    type: "GROUP",
+    name: "Wrapper",
+    layoutMode: "NONE",
+    opacity: 1,
+    rotation: 0,
+    effects: [],
+    blendMode: "PASS_THROUGH",
+    absoluteBoundingBox: { x: 20, y: 30, width: 160, height: 80 },
+  });
+  const { document } = normalizeSelection([
+    layer("zero", { width: 0 }),
+    group,
+    layer("hidden", { visible: false }),
+  ]);
+  expect(document.roots.map(({ id }) => id)).toEqual(["paint"]);
+  expect(document.roots[0].visual).toMatchObject({
+    order: 1,
+    mixed: true,
+    bounds: { x: 20, y: 30, width: 160, height: 80 },
+  });
+});

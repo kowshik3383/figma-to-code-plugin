@@ -26,6 +26,7 @@ export interface TailwindSettings extends HTMLSettings {
 export interface PluginSettings extends HTMLSettings, TailwindSettings {
   framework: Framework;
   useOldPluginVersion2025: boolean;
+  designCompiler?: boolean;
   responsiveRoot: boolean;
 }
 export interface DetectedAsset {
@@ -67,7 +68,7 @@ export interface UIMessage {
   pluginMessage: Message;
 }
 export type EmptyMessage = Message & { type: "empty" };
-export type ConversionStartMessage = Message & { type: "conversionStarted" };
+export type ConversionStartMessage = Message & { type: "conversionStart" };
 export type ConversionMessage = Message & {
   type: "code";
 } & ConversionData;
@@ -94,6 +95,16 @@ export type ProjectZipMessage = Message & {
   zip: ArrayBuffer;
   format: DownloadProjectFormat;
   fileName: string;
+};
+export type AssetDownloadMessage = Message & {
+  type: "download-file";
+  bytes: ArrayBuffer;
+  fileName: string;
+  mimeType: string;
+};
+export type AssetExportErrorMessage = Message & {
+  type: "asset-export-error";
+  error: string;
 };
 export type ProjectDownloadErrorMessage = Message & {
   type: "project-download-error";

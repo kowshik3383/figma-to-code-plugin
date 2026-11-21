@@ -6,13 +6,15 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 const createCanvasImageUrl = (width: number, height: number): string => {
+  width = Math.max(1, Math.min(width, 1024));
+  height = Math.max(1, Math.min(height, 1024));
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
 
   const ctx = canvas.getContext("2d");
   if (!ctx) {
-    return `https://placehold.co/${width}x${height}`;
+    return "";
   }
 
   ctx.fillStyle = "#f5f5f5";

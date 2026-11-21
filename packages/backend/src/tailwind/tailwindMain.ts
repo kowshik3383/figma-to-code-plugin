@@ -1,12 +1,7 @@
 import { indentString } from "../common/indentString";
 import { addWarning } from "../common/commonConversionWarnings";
 import { getVisibleNodes } from "../common/nodeVisibility";
-import {
-  getImageFills,
-  getImageSrc,
-  getVectorSrc,
-  nodeHasImageFill,
-} from "../common/images";
+import { getImageSrc, getVectorSrc, nodeHasImageFill } from "../common/images";
 import { TailwindTextBuilder } from "./tailwindTextBuilder";
 import { TailwindDefaultBuilder } from "./tailwindDefaultBuilder";
 import { tailwindAutoLayoutProps } from "./builderImpl/tailwindAutoLayout";
@@ -69,6 +64,15 @@ const convertNode =
       }
     }
 
+    if (
+      (node.type === "STAR" ||
+        node.type === "POLYGON" ||
+        node.type === "BOOLEAN_OPERATION" ||
+        node.type === "LINE") &&
+      nodeHasImageFill(node)
+    ) {
+      return tailwindContainer(node, "", "", settings);
+    }
     switch ((node as any).type) {
       case "RECTANGLE":
       case "ELLIPSE":
@@ -296,19 +300,14 @@ export const tailwindContainer = async (
   let src = "";
   if (nodeHasImageFill(node)) {
     const imageURL = await getImageSrc(node, settings);
-    const imageFills = getImageFills(node);
-    const scaleMode = imageFills[0]?.scaleMode || "FILL";
-    const objectFitClass =
-      scaleMode === "FIT" ? "object-contain" : "object-cover";
-
     if (!("children" in node) || node.children.length === 0) {
       tag = "img";
       const cleanAlt = (node.name || "image").replace(/"/g, "&quot;");
       src = ` src="${imageURL}" alt="${cleanAlt}"`;
-      builder.addAttributes(objectFitClass);
+      builder.addAttributes("object-fill");
     } else {
       builder.addAttributes(
-        `bg-[url(${imageURL})] bg-cover bg-center bg-no-repeat`,
+        `bg-[url(${imageURL})] bg-[length:100%_100%] bg-center bg-no-repeat`,
       );
     }
   }

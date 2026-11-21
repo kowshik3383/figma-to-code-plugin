@@ -6,12 +6,7 @@ import { formatWithJSX } from "../common/parseJSX";
 import { PluginSettings, HTMLPreview, AltNode, HTMLSettings } from "types";
 import { renderAndAttachSVG } from "../altNodes/altNodeUtils";
 import { getVisibleNodes } from "../common/nodeVisibility";
-import {
-  getImageFills,
-  getImageSrc,
-  getVectorSrc,
-  nodeHasImageFill,
-} from "../common/images";
+import { getImageSrc, getVectorSrc, nodeHasImageFill } from "../common/images";
 import { addWarning } from "../common/commonConversionWarnings";
 
 const selfClosingTags = ["img"];
@@ -406,6 +401,15 @@ const convertNode = (settings: HTMLSettings) => async (node: SceneNode) => {
     }
   }
 
+  if (
+    (node.type === "STAR" ||
+      node.type === "POLYGON" ||
+      node.type === "BOOLEAN_OPERATION" ||
+      node.type === "LINE") &&
+    nodeHasImageFill(node)
+  ) {
+    return htmlContainer(node, "", [], settings);
+  }
   switch ((node as any).type) {
     case "RECTANGLE":
     case "ELLIPSE":
@@ -615,17 +619,11 @@ const htmlContainer = async (
       const hasChildren = "children" in node && node.children.length > 0;
       const imgUrl = await getImageSrc(node, settings);
       const isJSX = settings.htmlGenerationMode === "jsx";
-      const imageFills = getImageFills(node);
-      const scaleMode = imageFills[0]?.scaleMode || "FILL";
 
       if (hasChildren) {
         builder.addStyles(
           formatWithJSX("background-image", isJSX, `url(${imgUrl})`),
-          formatWithJSX(
-            "background-size",
-            isJSX,
-            scaleMode === "FIT" ? "contain" : "cover",
-          ),
+          formatWithJSX("background-size", isJSX, "100% 100%"),
           formatWithJSX("background-position", isJSX, "center"),
           formatWithJSX("background-repeat", isJSX, "no-repeat"),
         );
@@ -633,13 +631,7 @@ const htmlContainer = async (
         tag = "img";
         const cleanAlt = (node.name || "image").replace(/"/g, "&quot;");
         src = ` src="${imgUrl}" alt="${cleanAlt}"`;
-        builder.addStyles(
-          formatWithJSX(
-            "object-fit",
-            isJSX,
-            scaleMode === "FIT" ? "contain" : "cover",
-          ),
-        );
+        builder.addStyles(formatWithJSX("object-fit", isJSX, "fill"));
       }
     }
 

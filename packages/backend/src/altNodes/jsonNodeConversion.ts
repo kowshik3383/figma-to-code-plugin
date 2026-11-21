@@ -489,6 +489,27 @@ const processNodePair = async (
     "LINE",
   ]);
 
+  // Live Plugin API paints carry imageHash and current visibility.
+  // Retain the original REST fills for non-image color/style processing.
+  if ("fills" in figmaNode && Array.isArray(figmaNode.fills)) {
+    const restFills =
+      "fills" in jsonNode && Array.isArray(jsonNode.fills)
+        ? jsonNode.fills
+        : [];
+    if (
+      figmaNode.fills.some((paint) => paint.type === "IMAGE") ||
+      restFills.some((paint) => paint.type === "IMAGE")
+    ) {
+      Object.assign(jsonNode, {
+        fills: figmaNode.fills.map((paint, index) =>
+          paint.type !== "IMAGE" && restFills[index]?.type === paint.type
+            ? restFills[index]
+            : paint,
+        ),
+      });
+    }
+  }
+
   // Add canBeFlattened property
   if (settings.embedVectors) {
     const hasImage = nodeHasImageFill(jsonNode);

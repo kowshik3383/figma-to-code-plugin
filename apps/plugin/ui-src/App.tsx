@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { PluginUI } from "plugin-ui";
 import {
+  AssetDownloadMessage,
+  AssetExportErrorMessage,
   Framework,
   PluginSettings,
   ConversionMessage,
@@ -13,6 +15,7 @@ import {
   Warning,
   DownloadProjectFormat,
   ProjectDownloadErrorMessage,
+  ProjectZipMessage,
   DetectedAsset,
   CompilationMetrics,
 } from "types";
@@ -32,6 +35,7 @@ interface AppState {
   metrics?: CompilationMetrics;
   isDownloadingProject: boolean;
   projectDownloadError: string | null;
+  assetExportError: string | null;
 }
 
 const emptyPreview = { size: { width: 0, height: 0 }, content: "" };
@@ -60,6 +64,7 @@ export default function App() {
     assets: [],
     isDownloadingProject: false,
     projectDownloadError: null,
+    assetExportError: null,
   });
 
   const rootStyles = getComputedStyle(document.documentElement);
@@ -69,8 +74,9 @@ export default function App() {
 
   useEffect(() => {
     window.onmessage = (event: MessageEvent) => {
-      const untypedMessage = event.data.pluginMessage as Message;
-      console.log("[ui] message received:", untypedMessage);
+      if (event.source !== parent) return;
+      const untypedMessage = event.data?.pluginMessage as Message | undefined;
+      if (!untypedMessage || typeof untypedMessage.type !== "string") return;
 
       switch (untypedMessage.type) {
         case "conversionStart":
@@ -86,6 +92,7 @@ export default function App() {
           setState((prevState) => ({
             ...prevState,
             ...conversionMessage,
+            assetExportError: null,
             selectedFramework: conversionMessage.settings.framework,
             isLoading: false,
           }));
@@ -109,6 +116,8 @@ export default function App() {
             warnings: [],
             colors: [],
             gradients: [],
+            assets: [],
+            assetExportError: null,
             isLoading: false,
           }));
           break;
@@ -121,6 +130,10 @@ export default function App() {
             colors: [],
             gradients: [],
             code: `Error :(\n// ${errorMessage.error}`,
+            assets: [],
+            htmlPreview: emptyPreview,
+            warnings: [],
+            assetExportError: null,
             isLoading: false,
           }));
           break;
@@ -142,7 +155,7 @@ export default function App() {
           document.body.appendChild(link);
           link.click();
           link.remove();
-          URL.revokeObjectURL(url);
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
           setState((prevState) => ({
             ...prevState,
             isDownloadingProject: false,
@@ -162,7 +175,13 @@ export default function App() {
         }
 
         case "download-file": {
-          const fileMsg = untypedMessage as any;
+          const fileMsg = untypedMessage as AssetDownloadMessage;
+          if (
+            !(fileMsg.bytes instanceof ArrayBuffer) ||
+            typeof fileMsg.fileName !== "string"
+          )
+            break;
+          setState((prevState) => ({ ...prevState, assetExportError: null }));
           const blob = new Blob([fileMsg.bytes], {
             type: fileMsg.mimeType || "application/octet-stream",
           });
@@ -173,7 +192,13 @@ export default function App() {
           document.body.appendChild(link);
           link.click();
           link.remove();
-          URL.revokeObjectURL(url);
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          break;
+        }
+
+        case "asset-export-error": {
+          const { error } = untypedMessage as AssetExportErrorMessage;
+          setState((prevState) => ({ ...prevState, assetExportError: error }));
           break;
         }
 
@@ -259,6 +284,7 @@ export default function App() {
         onDownloadProject={handleDownloadProject}
         isDownloadingProject={state.isDownloadingProject}
         projectDownloadError={state.projectDownloadError}
+        assetExportError={state.assetExportError}
       />
     </div>
   );

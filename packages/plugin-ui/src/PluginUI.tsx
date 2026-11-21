@@ -48,6 +48,7 @@ type PluginUIProps = {
   onDownloadProject?: (format: DownloadProjectFormat) => void;
   isDownloadingProject?: boolean;
   projectDownloadError?: string | null;
+  assetExportError?: string | null;
 };
 
 const frameworks: Framework[] = ["HTML", "Tailwind"];
@@ -172,7 +173,7 @@ export const PluginUI = (props: PluginUIProps) => {
             </div>
           ) : (
             <div className="flex flex-col items-center px-3.5 pt-3 pb-4 gap-3 w-full max-w-full">
-              {props.htmlPreview && (
+              {props.htmlPreview.content && (
                 <Preview
                   htmlPreview={props.htmlPreview}
                   expanded={previewExpanded}
@@ -221,6 +222,11 @@ export const PluginUI = (props: PluginUIProps) => {
               {props.assets && props.assets.length > 0 && (
                 <div className="w-full">
                   <AssetsPanel assets={props.assets} />
+                  {props.assetExportError && (
+                    <p role="alert" className="mt-2 text-sm text-destructive">
+                      {props.assetExportError}
+                    </p>
+                  )}
                 </div>
               )}
 

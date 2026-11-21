@@ -51,6 +51,13 @@ export const AssetsPanel: React.FC<AssetsPanelProps> = ({
     return true;
   });
 
+  const selectedInFilter = filteredAssets.filter(({ id }) =>
+    selectedIds.has(id),
+  );
+  const allInFilterSelected =
+    filteredAssets.length > 0 &&
+    selectedInFilter.length === filteredAssets.length;
+
   const getAssetScale = (id: string): ScaleOption =>
     assetScales[id] ?? globalScale;
 
@@ -77,11 +84,14 @@ export const AssetsPanel: React.FC<AssetsPanelProps> = ({
   };
 
   const selectAll = () => {
-    if (selectedIds.size === filteredAssets.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filteredAssets.map((a) => a.id)));
-    }
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      for (const asset of filteredAssets) {
+        if (allInFilterSelected) next.delete(asset.id);
+        else next.add(asset.id);
+      }
+      return next;
+    });
   };
 
   const formatFileName = (asset: DetectedAsset, scale: number) => {
@@ -121,9 +131,7 @@ export const AssetsPanel: React.FC<AssetsPanelProps> = ({
 
   const handleDownloadSelected = () => {
     const targetAssets =
-      selectedIds.size > 0
-        ? filteredAssets.filter((a) => selectedIds.has(a.id))
-        : filteredAssets;
+      selectedInFilter.length > 0 ? selectedInFilter : filteredAssets;
 
     if (targetAssets.length === 0) return;
 
@@ -169,8 +177,7 @@ export const AssetsPanel: React.FC<AssetsPanelProps> = ({
     );
   }
 
-  const allSelected =
-    filteredAssets.length > 0 && selectedIds.size === filteredAssets.length;
+  const allSelected = filteredAssets.length > 0 && allInFilterSelected;
 
   return (
     <div className="flex flex-col gap-2.5 w-full bg-card border border-border rounded-xl p-3.5 shadow-xs">
@@ -257,8 +264,8 @@ export const AssetsPanel: React.FC<AssetsPanelProps> = ({
         >
           <Archive className="w-3.5 h-3.5" />
           <span>
-            {selectedIds.size > 0
-              ? `Export (${selectedIds.size})`
+            {selectedInFilter.length > 0
+              ? `Export (${selectedInFilter.length})`
               : `Export All (${filteredAssets.length})`}
           </span>
         </Button>

@@ -3,7 +3,7 @@
 exports[`compiler output contract > snapshots semantic HTML, JSX and Tailwind from the same IR > HTML 1`] = `
 "<section style="box-sizing: border-box; margin: 0; min-width: 0; width: 480px; max-width: 100%; min-height: 80px; position: relative; display: flex; flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: var(--figma-space-1, 12px) var(--figma-space-1, 12px) var(--figma-space-1, 12px) var(--figma-space-1, 12px); gap: var(--figma-space-1, 12px); background-image: url(&quot;images/section-card-2-0.png&quot;); background-size: 100% 100%; background-repeat: no-repeat">
   <img src="images/alt-a-blue-bicycle-2-2.png" alt="A &quot;blue&quot; bicycle" width="160" height="80" style="box-sizing: border-box; margin: 0; min-width: 0; width: 160px; max-width: 100%; min-height: 0; display: block; height: auto">
-  <h2 style="box-sizing: border-box; margin: 0; min-width: 0; width: 100%; max-width: 100%; flex: 1 1 0%; color: var(--figma-color-2, rgba(0, 0, 0, 1)); white-space: pre-wrap; overflow-wrap: anywhere; text-align: left; font-size: var(--figma-font-size-3, 20px); font-family: var(--figma-font-4, &quot;Inter&quot;, sans-serif); font-weight: 700">A &lt; B &amp; {value}</h2>
+  <h2 style="box-sizing: border-box; margin: 0; min-width: 0; width: 100%; max-width: 100%; flex: 1 1 0%; color: var(--figma-color-2, rgba(0, 0, 0, 1)); white-space: pre-wrap; overflow-wrap: anywhere; text-align: left; font-size: var(--figma-font-size-3, 20px); font-family: var(--figma-font-4, &quot;Inter&quot;, system-ui, sans-serif); font-weight: 700">A &lt; B &amp; {value}</h2>
 </section>"
 `;
 
@@ -11,7 +11,7 @@ exports[`compiler output contract > snapshots semantic HTML, JSX and Tailwind fr
 "<>
   <section style={{"boxSizing":"border-box","margin":"0","minWidth":"0","width":"480px","maxWidth":"100%","minHeight":"80px","position":"relative","display":"flex","flexDirection":"row","flexWrap":"wrap","justifyContent":"space-between","alignItems":"center","padding":"var(--figma-space-1, 12px) var(--figma-space-1, 12px) var(--figma-space-1, 12px) var(--figma-space-1, 12px)","gap":"var(--figma-space-1, 12px)","backgroundImage":"url(\\"images/section-card-2-0.png\\")","backgroundSize":"100% 100%","backgroundRepeat":"no-repeat"}}>
     <img src={"images/alt-a-blue-bicycle-2-2.png"} alt={"A \\"blue\\" bicycle"} width="160" height="80" style={{"boxSizing":"border-box","margin":"0","minWidth":"0","width":"160px","maxWidth":"100%","minHeight":"0","display":"block","height":"auto"}} />
-    <h2 style={{"boxSizing":"border-box","margin":"0","minWidth":"0","width":"100%","maxWidth":"100%","flex":"1 1 0%","color":"var(--figma-color-2, rgba(0, 0, 0, 1))","whiteSpace":"pre-wrap","overflowWrap":"anywhere","textAlign":"left","fontSize":"var(--figma-font-size-3, 20px)","fontFamily":"var(--figma-font-4, \\"Inter\\", sans-serif)","fontWeight":"700"}}>{"A < B & {value}"}</h2>
+    <h2 style={{"boxSizing":"border-box","margin":"0","minWidth":"0","width":"100%","maxWidth":"100%","flex":"1 1 0%","color":"var(--figma-color-2, rgba(0, 0, 0, 1))","whiteSpace":"pre-wrap","overflowWrap":"anywhere","textAlign":"left","fontSize":"var(--figma-font-size-3, 20px)","fontFamily":"var(--figma-font-4, \\"Inter\\", system-ui, sans-serif)","fontWeight":"700"}}>{"A < B & {value}"}</h2>
   </section>
 </>"
 `;
@@ -19,6 +19,6 @@ exports[`compiler output contract > snapshots semantic HTML, JSX and Tailwind fr
 exports[`compiler output contract > snapshots semantic HTML, JSX and Tailwind from the same IR > Tailwind 1`] = `
 "<section class="flex flex-row flex-wrap" style="box-sizing: border-box; margin: 0; min-width: 0; width: 480px; max-width: 100%; min-height: 80px; position: relative; justify-content: space-between; align-items: center; padding: var(--figma-space-1, 12px) var(--figma-space-1, 12px) var(--figma-space-1, 12px) var(--figma-space-1, 12px); gap: var(--figma-space-1, 12px); background-image: url(&quot;images/section-card-2-0.png&quot;); background-size: 100% 100%; background-repeat: no-repeat">
   <img src="images/alt-a-blue-bicycle-2-2.png" alt="A &quot;blue&quot; bicycle" width="160" height="80" style="box-sizing: border-box; margin: 0; min-width: 0; width: 160px; max-width: 100%; min-height: 0; display: block; height: auto">
-  <h2 style="box-sizing: border-box; margin: 0; min-width: 0; width: 100%; max-width: 100%; flex: 1 1 0%; color: var(--figma-color-2, rgba(0, 0, 0, 1)); white-space: pre-wrap; overflow-wrap: anywhere; text-align: left; font-size: var(--figma-font-size-3, 20px); font-family: var(--figma-font-4, &quot;Inter&quot;, sans-serif); font-weight: 700">A &lt; B &amp; {value}</h2>
+  <h2 style="box-sizing: border-box; margin: 0; min-width: 0; width: 100%; max-width: 100%; flex: 1 1 0%; color: var(--figma-color-2, rgba(0, 0, 0, 1)); white-space: pre-wrap; overflow-wrap: anywhere; text-align: left; font-size: var(--figma-font-size-3, 20px); font-family: var(--figma-font-4, &quot;Inter&quot;, system-ui, sans-serif); font-weight: 700">A &lt; B &amp; {value}</h2>
 </section>"
 `;

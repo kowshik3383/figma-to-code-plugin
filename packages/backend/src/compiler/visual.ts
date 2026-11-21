@@ -170,7 +170,22 @@ function flexFromBounds(node: DesignNode, horizontal: boolean): boolean {
     padding,
   };
   node.children = sorted;
-  for (const child of sorted) useFlow(child);
+  for (const child of sorted) {
+    useFlow(child);
+    if (
+      !horizontal &&
+      close(
+        child.visual.bounds.width,
+        crossEnd(parent) - crossStart(parent) - crossBefore - crossAfter,
+      ) &&
+      close(crossStart(child.visual.bounds), crossMin) &&
+      child.visual.sizing.horizontal === "fixed" &&
+      !child.visual.explicitWidth
+    ) {
+      child.visual.sizing.horizontal = "fill";
+      child.style.width = "100%";
+    }
+  }
   return true;
 }
 

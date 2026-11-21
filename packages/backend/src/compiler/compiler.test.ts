@@ -491,3 +491,28 @@ it("expands an overflowing freeform frame but bounds an explicitly clipped frame
     ),
   ).toBe(true);
 });
+
+it("uses hug sizing and preserves Figma typography without a fixed text height", () => {
+  vi.stubGlobal("figma", { mixed });
+  const text = layer("text", {
+    type: "TEXT",
+    characters: "Long text",
+    textAlignHorizontal: "LEFT",
+    textAutoResize: "WIDTH_AND_HEIGHT",
+    fontName: { family: "Courier Prime", style: "Italic" },
+    fontSize: 16,
+    fontWeight: 400,
+    lineHeight: { unit: "PERCENT", value: 140 },
+    letterSpacing: { unit: "PERCENT", value: 5 },
+  });
+  const [result] = normalizeSelection([text]).document.roots;
+  expect(result.visual.sizing).toEqual({ horizontal: "hug", vertical: "hug" });
+  expect(result.style).toMatchObject({
+    width: "fit-content",
+    lineHeight: "1.4",
+    letterSpacing: "0.05em",
+    fontStyle: "italic",
+  });
+  expect(result.style.fontFamily).toContain("monospace");
+  expect(result.style.height).toBeUndefined();
+});

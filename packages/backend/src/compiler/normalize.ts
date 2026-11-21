@@ -14,6 +14,7 @@ import type {
   GridTrack,
   SemanticTag,
   Style,
+  VisualLayer,
 } from "./model";
 
 const px = (value: number) => `${Math.round(value * 100) / 100}px`;
@@ -107,7 +108,7 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
       width: node.width,
       height: node.height,
     };
-    const visual = {
+    const visual: VisualLayer = {
       bounds: { ...bounds },
       type: node.type,
       order,
@@ -118,6 +119,7 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
         ("blendMode" in node &&
           node.blendMode !== "PASS_THROUGH" &&
           node.blendMode !== "NORMAL"),
+      sizing: { horizontal: "fixed", vertical: "fixed" },
       mixed: "fills" in node && typeof node.fills === "symbol",
       fills:
         "fills" in node && Array.isArray(node.fills)
@@ -173,12 +175,25 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
       node.type === "TEXT" && node.textAutoResize === "WIDTH_AND_HEIGHT";
     const fitTextHeight =
       node.type === "TEXT" && node.textAutoResize !== "NONE";
+    visual.explicitWidth = parentMode !== "NONE" && widthMode !== undefined;
+    visual.sizing = {
+      horizontal:
+        widthMode === "FILL"
+          ? "fill"
+          : widthMode === "HUG" || fitTextWidth
+            ? "hug"
+            : "fixed",
+      vertical:
+        heightMode === "FILL"
+          ? "fill"
+          : heightMode === "HUG" || fitTextHeight
+            ? "hug"
+            : "fixed",
+    };
     style.width =
-      widthMode === "HUG" || fitTextWidth ? "fit-content" : px(node.width);
+      visual.sizing.horizontal === "hug" ? "fit-content" : px(node.width);
     style.maxWidth = "100%";
-    if (text === undefined && heightMode !== "HUG")
-      style.minHeight = px(node.height);
-    if (text !== undefined && !fitTextHeight) style.minHeight = px(node.height);
+    if (visual.sizing.vertical === "fixed") style.minHeight = px(node.height);
     if (inFlow && widthMode === "FILL") {
       style.width = "100%";
       if (parentMode === "HORIZONTAL") style.flex = "1 1 0%";
@@ -258,10 +273,47 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
           : node.textAlignHorizontal.toLowerCase();
       if (typeof node.fontSize === "number")
         style.fontSize = token("font-size", px(node.fontSize));
-      if (typeof node.fontName === "object")
-        style.fontFamily = token(
-          "font",
-          `${JSON.stringify(node.fontName.family)}, sans-serif`,
+      const font =
+        typeof node.fontName === "object" ? node.fontName : undefined;
+      const fallback =
+        font && /mono|courier/i.test(font.family)
+          ? "monospace"
+          : font &&
+              /serif|times|georgia/i.test(font.family) &&
+              !/sans/i.test(font.family)
+            ? "serif"
+            : "system-ui, sans-serif";
+      const fontFamily = font
+        ? `${JSON.stringify(font.family)}, ${fallback}`
+        : fallback;
+      style.fontFamily = token("font", fontFamily);
+      if (font && /italic|oblique/i.test(font.style))
+        style.fontStyle = "italic";
+      const line = node.lineHeight;
+      const spacing = node.letterSpacing;
+      const lineHeight =
+        typeof line !== "object" || line.unit === "AUTO"
+          ? "normal"
+          : line.unit === "PIXELS"
+            ? px(line.value)
+            : String(line.value / 100);
+      const letterSpacing =
+        typeof spacing !== "object"
+          ? "normal"
+          : spacing.unit === "PIXELS"
+            ? px(spacing.value)
+            : `${spacing.value / 100}em`;
+      if (lineHeight !== "normal") style.lineHeight = lineHeight;
+      if (letterSpacing !== "normal") style.letterSpacing = letterSpacing;
+      visual.textMetrics = {
+        autoResize: node.textAutoResize,
+        lineHeight,
+        letterSpacing,
+        fontFamily,
+      };
+      if (node.textAutoResize === "TRUNCATE")
+        document.diagnostics.push(
+          `Text truncation on ${node.name} (${node.id}) needs review; generated text wraps.`,
         );
       if (typeof node.fontWeight === "number")
         style.fontWeight = String(node.fontWeight);

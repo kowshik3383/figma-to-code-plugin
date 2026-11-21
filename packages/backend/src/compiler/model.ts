@@ -64,6 +64,17 @@ export interface VisualLayer {
   order: number;
   clips: boolean;
   mixed: boolean;
+  explicitWidth?: boolean;
+  sizing: {
+    horizontal: "hug" | "fill" | "fixed";
+    vertical: "hug" | "fill" | "fixed";
+  };
+  textMetrics?: {
+    autoResize: string;
+    lineHeight: string;
+    letterSpacing: string;
+    fontFamily: string;
+  };
   complex: boolean;
   fills: { kind: string; opacity: number }[];
 }

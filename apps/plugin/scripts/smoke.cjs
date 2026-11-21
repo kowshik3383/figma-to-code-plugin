@@ -130,11 +130,46 @@ const figma = {
   const compatibility = messages.filter(({ type }) => type === "code").at(-1);
   assert.match(compatibility.code, /You can still download assets/);
   assert.equal(compatibility.assets[0].id, second.id);
+  await ui.onmessage({
+    type: "pluginSettingWillChange",
+    key: "outputFormat",
+    value: "single-html",
+  });
+  for (
+    let attempts = 0;
+    attempts < 50 && messages.filter(({ type }) => type === "code").length < 3;
+    attempts += 1
+  )
+    await wait(10);
+  const standalone = messages.filter(({ type }) => type === "code").at(-1);
+  assert.equal(standalone.settings.outputFormat, "single-html");
+  assert.equal(standalone.htmlPreview.useCode, true);
+  assert.match(standalone.code, /data:image\/png;base64/);
+  await ui.onmessage({ type: "download-project", format: "single-html" });
+  const htmlFile = messages
+    .filter(({ type }) => type === "download-file")
+    .at(-1);
+  assert.match(htmlFile.fileName, /\.html$/);
+  assert.match(
+    strFromU8(new Uint8Array(htmlFile.bytes)),
+    /<!DOCTYPE html>[\s\S]+<style>[\s\S]+data:image\/png;base64/,
+  );
+  await ui.onmessage({ type: "download-project", format: "separate-html" });
+  const stylesZip = messages
+    .filter(({ type }) => type === "download-file")
+    .at(-1);
+  const documentFiles = unzipSync(new Uint8Array(stylesZip.bytes));
+  assert.ok(documentFiles["styles.css"]);
+  assert.match(
+    strFromU8(documentFiles["index.html"]),
+    /assets\/alt-updated-1-2.png/,
+  );
+  assert.ok(documentFiles["assets/alt-updated-1-2.png"]);
   page.selection = [];
   listeners.get("selectionchange")();
   assert.ok(messages.some(({ type }) => type === "empty"));
   console.log(
-    "Bundled plugin smoke passed: stale selection suppressed, preview published, PNG and Vite ZIP returned, compatibility failure retained assets, empty selection cleared.",
+    "Bundled plugin smoke passed: stale selection suppressed, preview published, PNG and Vite ZIP returned, standalone HTML and separate CSS downloaded, empty selection cleared.",
   );
 })().catch((error) => {
   console.error(error);

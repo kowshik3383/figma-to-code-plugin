@@ -13,7 +13,7 @@ import {
   ErrorMessage,
   SettingsChangedMessage,
   Warning,
-  DownloadProjectFormat,
+  DownloadFormat,
   ProjectDownloadErrorMessage,
   ProjectZipMessage,
   DetectedAsset,
@@ -24,6 +24,7 @@ import copy from "copy-to-clipboard";
 
 interface AppState {
   code: string;
+  documentCss?: string;
   selectedFramework: Framework;
   isLoading: boolean;
   htmlPreview: HTMLPreview;
@@ -92,6 +93,7 @@ export default function App() {
           setState((prevState) => ({
             ...prevState,
             ...conversionMessage,
+            documentCss: conversionMessage.documentCss,
             assetExportError: null,
             selectedFramework: conversionMessage.settings.framework,
             isLoading: false,
@@ -181,7 +183,13 @@ export default function App() {
             typeof fileMsg.fileName !== "string"
           )
             break;
-          setState((prevState) => ({ ...prevState, assetExportError: null }));
+          setState((prevState) => ({
+            ...prevState,
+            assetExportError: null,
+            isDownloadingProject: fileMsg.project
+              ? false
+              : prevState.isDownloadingProject,
+          }));
           const blob = new Blob([fileMsg.bytes], {
             type: fileMsg.mimeType || "application/octet-stream",
           });
@@ -238,7 +246,7 @@ export default function App() {
       postUISettingsChangingMessage(key, value, { targetOrigin: "*" });
     }
   };
-  const handleDownloadProject = (format: DownloadProjectFormat) => {
+  const handleDownloadProject = (format: DownloadFormat) => {
     if (state.isDownloadingProject) {
       return;
     }
@@ -271,6 +279,7 @@ export default function App() {
       <PluginUI
         isLoading={state.isLoading}
         code={state.code}
+        documentCss={state.documentCss}
         warnings={state.warnings}
         selectedFramework={state.selectedFramework}
         setSelectedFramework={handleFrameworkChange}

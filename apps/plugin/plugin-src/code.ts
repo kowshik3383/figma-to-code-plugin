@@ -19,6 +19,10 @@ import {
   supportsCompiler,
 } from "backend/src/compiler/session";
 import { exportAsset, visibleSelection } from "backend/src/compiler/assets";
+import {
+  encodeHtmlFile,
+  prepareHtmlExport,
+} from "backend/src/compiler/htmlExport";
 import { normalizeSelection } from "backend/src/compiler/normalize";
 import { webGenerator } from "backend/src/compiler/web";
 import {
@@ -28,6 +32,7 @@ import {
 import { generateAssetZip } from "backend/src/zipGenerator";
 import {
   AssetDownloadMessage,
+  DownloadFormat,
   DownloadProjectFormat,
   PluginSettings,
   SettingWillChangeMessage,
@@ -40,6 +45,9 @@ export const defaultPluginSettings: PluginSettings = {
   showLayerNames: false,
   useOldPluginVersion2025: false,
   designCompiler: false,
+  outputFormat: "framework",
+  embedDocumentImages: true,
+  linkGoogleFonts: false,
   responsiveRoot: false,
   roundTailwindValues: true,
   roundTailwindColors: true,
@@ -157,6 +165,7 @@ function postAssetDownload(
   bytes: Uint8Array,
   fileName: string,
   mimeType: string,
+  project = false,
 ) {
   if (bytes.byteLength > 10 * 1024 * 1024) {
     throw new Error(
@@ -168,6 +177,7 @@ function postAssetDownload(
     bytes: Uint8Array.from(bytes).buffer,
     fileName,
     mimeType,
+    project,
   };
   figma.ui.postMessage(message);
 }
@@ -304,6 +314,53 @@ const generateDownloadCode = async (
     true,
   );
   return result?.html || "<div>Failed to generate HTML</div>";
+};
+
+const downloadHtmlDocument = async (
+  format: "single-html" | "separate-html" | "html-assets",
+) => {
+  const selection = visibleSelection(figma.currentPage.selection);
+  const { document, sources } = normalizeSelection(selection);
+  if (!document.roots.length)
+    throw new Error("Select a visible layer to export.");
+  const embed =
+    format === "single-html" &&
+    userPluginSettings.embedDocumentImages !== false;
+  const result = await prepareHtmlExport(
+    document,
+    sources,
+    embed,
+    format === "separate-html",
+    undefined,
+    userPluginSettings.linkGoogleFonts,
+  );
+  if (!result) return;
+  const fileName = getRootSelectionName(selection);
+  if (format === "single-html") {
+    postAssetDownload(
+      encodeHtmlFile(result.html),
+      `${fileName}.html`,
+      "text/html;charset=utf-8",
+      true,
+    );
+    return;
+  }
+  const files =
+    format === "html-assets"
+      ? result.assets
+      : {
+          "index.html": encodeHtmlFile(result.html),
+          "styles.css": encodeHtmlFile(result.css),
+          ...(embed ? {} : result.assets),
+        };
+  if (!Object.keys(files).length)
+    throw new Error("No separate assets are needed for this selection.");
+  postAssetDownload(
+    generateAssetZip(files),
+    `${fileName}-${format}.zip`,
+    "application/zip",
+    true,
+  );
 };
 
 const downloadProject = async (format: DownloadProjectFormat) => {
@@ -484,7 +541,14 @@ const standardMode = async () => {
 
       isDownloadingProject = true;
       try {
-        await downloadProject(msg.format as DownloadProjectFormat);
+        const format = msg.format as DownloadFormat;
+        if (
+          format === "single-html" ||
+          format === "separate-html" ||
+          format === "html-assets"
+        )
+          await downloadHtmlDocument(format);
+        else await downloadProject(format);
       } catch (error) {
         console.error("Download project failed:", error);
         figma.ui.postMessage({
@@ -571,6 +635,13 @@ const standardMode = async () => {
       if (
         !isKeyOfPluginSettings(key) ||
         typeof value !== typeof defaultPluginSettings[key]
+      )
+        return;
+      if (
+        key === "outputFormat" &&
+        value !== "framework" &&
+        value !== "single-html" &&
+        value !== "separate-html"
       )
         return;
       userPluginSettings = { ...userPluginSettings, [key]: value };

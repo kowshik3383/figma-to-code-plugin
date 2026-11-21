@@ -9,7 +9,7 @@ import WarningsPanel from "./components/WarningsPanel";
 import AssetsPanel from "./components/AssetsPanel";
 import {
   Framework,
-  DownloadProjectFormat,
+  DownloadFormat,
   HTMLPreview,
   LinearGradientConversion,
   PluginSettings,
@@ -31,6 +31,7 @@ import { TooltipProvider } from "./components/ui/tooltip";
 
 type PluginUIProps = {
   code: string;
+  documentCss?: string;
   htmlPreview: HTMLPreview;
   warnings: Warning[];
   selectedFramework: Framework;
@@ -45,7 +46,7 @@ type PluginUIProps = {
   assets?: DetectedAsset[];
   metrics?: CompilationMetrics;
   isLoading: boolean;
-  onDownloadProject?: (format: DownloadProjectFormat) => void;
+  onDownloadProject?: (format: DownloadFormat) => void;
   isDownloadingProject?: boolean;
   projectDownloadError?: string | null;
   assetExportError?: string | null;
@@ -127,6 +128,9 @@ export const PluginUI = (props: PluginUIProps) => {
 
   const isEmpty = props.code === "";
   const warnings = props.warnings ?? [];
+  const preview = props.htmlPreview.useCode
+    ? { ...props.htmlPreview, content: props.code }
+    : props.htmlPreview;
 
   return (
     <TooltipProvider>
@@ -173,9 +177,9 @@ export const PluginUI = (props: PluginUIProps) => {
             </div>
           ) : (
             <div className="flex flex-col items-center px-3.5 pt-3 pb-4 gap-3 w-full max-w-full">
-              {props.htmlPreview.content && (
+              {preview.content && (
                 <Preview
-                  htmlPreview={props.htmlPreview}
+                  htmlPreview={preview}
                   expanded={previewExpanded}
                   setExpanded={setPreviewExpanded}
                   viewMode={previewViewMode}
@@ -209,6 +213,10 @@ export const PluginUI = (props: PluginUIProps) => {
 
               <CodePanel
                 code={props.code}
+                documentCss={props.documentCss}
+                documentPreview={
+                  preview.fullDocument ? preview.content : undefined
+                }
                 selectedFramework={props.selectedFramework}
                 preferenceOptions={preferenceOptions}
                 selectPreferenceOptions={selectPreferenceOptions}

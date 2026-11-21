@@ -138,7 +138,14 @@ const Preview: React.FC<{
                     transformOrigin: "top left",
                     border: 0,
                   }}
-                  srcDoc={`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><style>body{margin:0}</style></head><body>${replaceExternalImagesWithCanvas(htmlPreview.content)}</body></html>`}
+                  srcDoc={
+                    htmlPreview.fullDocument
+                      ? htmlPreview.content.replace(
+                          "<head>",
+                          `<head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'${htmlPreview.allowRemoteFonts ? " https://fonts.googleapis.com; font-src https://fonts.gstatic.com" : ""}">`,
+                        )
+                      : `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><style>body{margin:0}</style></head><body>${replaceExternalImagesWithCanvas(htmlPreview.content)}</body></html>`
+                  }
                 />
               </div>
             </div>

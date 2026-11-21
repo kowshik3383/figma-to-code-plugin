@@ -417,3 +417,20 @@ it("captures page geometry and prunes invisible, zero-sized and redundant groups
     bounds: { x: 20, y: 30, width: 160, height: 80 },
   });
 });
+
+it("merges a full background and nests a later overlay over its contained rectangle", () => {
+  const fills = [{ type: "SOLID", color: { r: 1, g: 0, b: 0 } }];
+  const full = layer("full", { fills, width: 480 });
+  const card = layer("card", { fills, x: 20, y: 10, width: 100, height: 50 });
+  const overlay = layer("overlay", { x: 30, y: 20, width: 40, height: 15 });
+  const { document } = normalizeSelection([
+    row("root", [full, card, overlay], { layoutMode: "NONE" }),
+  ]);
+  const [root] = document.roots;
+  expect(root.style.backgroundColor).toContain("rgba(255, 0, 0");
+  expect(root.children.map(({ id }) => id)).toEqual(["card"]);
+  expect(root.children[0].children[0]).toMatchObject({
+    id: "overlay",
+    style: { left: "10px", top: "10px" },
+  });
+});

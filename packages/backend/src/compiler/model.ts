@@ -63,6 +63,7 @@ export interface VisualLayer {
   order: number;
   clips: boolean;
   mixed: boolean;
+  complex: boolean;
   fills: { kind: string; opacity: number }[];
 }
 

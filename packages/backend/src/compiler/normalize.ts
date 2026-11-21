@@ -1,3 +1,4 @@
+import { recoverContainment } from "./visual";
 import { getImageFills } from "../common/images";
 import { describeAsset, visibleSelection } from "./assets";
 import type {
@@ -107,15 +108,19 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
       type: node.type,
       order,
       clips: "clipsContent" in node && node.clipsContent,
+      complex:
+        ("effects" in node && node.effects.some((effect) => effect.visible)) ||
+        ("strokes" in node && node.strokes.some(activePaint)) ||
+        ("blendMode" in node &&
+          node.blendMode !== "PASS_THROUGH" &&
+          node.blendMode !== "NORMAL"),
       mixed: "fills" in node && typeof node.fills === "symbol",
       fills:
         "fills" in node && Array.isArray(node.fills)
-          ? node.fills
-              .filter(activePaint)
-              .map((paint) => ({
-                kind: paint.type,
-                opacity: paint.opacity ?? 1,
-              }))
+          ? node.fills.filter(activePaint).map((paint) => ({
+              kind: paint.type,
+              opacity: paint.opacity ?? 1,
+            }))
           : [],
     };
     const text = node.type === "TEXT" ? node.characters : undefined;
@@ -397,5 +402,6 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
     const normalized = visit(root, undefined, 0, index);
     if (normalized) document.roots.push(normalized);
   }
+  recoverContainment(document.roots);
   return { document, sources };
 }

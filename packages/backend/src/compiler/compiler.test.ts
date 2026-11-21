@@ -616,3 +616,49 @@ it("lists named layers for ambiguous stacking, masks and mixed fills", () => {
     ]),
   );
 });
+
+it("recovers selected siblings in absolute paint order and nests centered content in a rounded backdrop", () => {
+  const base = layer("base", {
+    cornerRadius: 8,
+    width: 110,
+    height: 60,
+    fills: [{ type: "SOLID", color: { r: 0, g: 1, b: 0 } }],
+    absoluteBoundingBox: { x: 500, y: 160, width: 110, height: 60 },
+  });
+  const top = layer("top", {
+    width: 40,
+    height: 18,
+    absoluteBoundingBox: { x: 530, y: 180, width: 40, height: 18 },
+  });
+  row("frame", [base, top]);
+  const { document } = normalizeSelection([top, base]);
+  expect(document.roots[0].visual.bounds).toEqual({
+    x: 500,
+    y: 160,
+    width: 110,
+    height: 60,
+  });
+  expect(document.roots[0].children).toHaveLength(1);
+  const background = document.roots[0];
+  expect(background.style.borderRadius).toBeUndefined();
+  expect(background.children[0].children[0].id).toBe("top");
+});
+
+it("keeps measured overlap when native Auto Layout uses negative spacing", () => {
+  const first = layer("first", { width: 65, height: 30 });
+  const second = layer("second", { x: 45, width: 65, height: 30 });
+  const { document } = normalizeSelection([
+    row("reverse", [first, second], {
+      itemSpacing: -20,
+      itemReverseZIndex: true,
+    }),
+  ]);
+  const [parent] = document.roots;
+  expect(parent.layout?.kind).toBe("freeform");
+  expect(parent.children[1].style).toMatchObject({
+    position: "absolute",
+    left: "45px",
+    zIndex: "1",
+  });
+  expect(parent.children[0].style.zIndex).toBe("2");
+});

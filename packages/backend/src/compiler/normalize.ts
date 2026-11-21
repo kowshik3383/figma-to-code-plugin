@@ -380,10 +380,12 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
             token("space", px(node.paddingLeft)),
           ],
         };
-        if (node.itemSpacing < 0)
+        if (node.itemSpacing < 0) {
+          layout = { kind: "freeform" };
           document.diagnostics.push(
-            `Negative spacing on ${node.name} needs manual styling.`,
+            `Negative Auto Layout spacing on ${node.name} (${node.id}); preserving measured placement where siblings overlap.`,
           );
+        }
       } else if ("layoutMode" in node && node.layoutMode === "GRID") {
         layout = {
           kind: "grid",
@@ -488,6 +490,68 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
   for (const [index, root] of selected.entries()) {
     const normalized = visit(root, undefined, 0, index);
     if (normalized) document.roots.push(normalized);
+  }
+  const commonParent = selected[0]?.parent;
+  if (
+    document.roots.length > 1 &&
+    commonParent &&
+    "children" in commonParent &&
+    selected.every(
+      (node) => node.parent?.id === commonParent.id && node.absoluteBoundingBox,
+    )
+  ) {
+    const paintOrder = new Map(
+      commonParent.children.map(({ id }, index) => [id, index]),
+    );
+    for (const node of document.roots) {
+      const original = selected[node.visual.order];
+      node.visual.order = paintOrder.get(original.id) ?? node.visual.order;
+    }
+    document.roots.sort((a, b) => a.visual.order - b.visual.order);
+    const bounds = document.roots.map(({ visual }) => visual.bounds);
+    const x = Math.min(...bounds.map((box) => box.x));
+    const y = Math.min(...bounds.map((box) => box.y));
+    const width = Math.max(...bounds.map((box) => box.x + box.width)) - x;
+    const height = Math.max(...bounds.map((box) => box.y + box.height)) - y;
+    for (const root of document.roots) {
+      root.style.left = px(root.visual.bounds.x - x);
+      root.style.top = px(root.visual.bounds.y - y);
+    }
+    document.roots = [
+      {
+        id: "visual-selection",
+        name: "Selection",
+        tag: "div",
+        visual: {
+          bounds: { x, y, width, height },
+          type: "SELECTION",
+          order: 0,
+          clips: false,
+          mixed: false,
+          complex: false,
+          maskedStack:
+            "layoutMode" in commonParent &&
+            "children" in commonParent &&
+            commonParent.children.some(
+              (node) => node.visible && "isMask" in node && node.isMask,
+            ),
+          reverseOrder:
+            "itemReverseZIndex" in commonParent &&
+            commonParent.itemReverseZIndex === true,
+          fills: [],
+          sizing: { horizontal: "fixed", vertical: "fixed" },
+        },
+        style: {
+          position: "relative",
+          width: px(width),
+          maxWidth: "100%",
+          minHeight: px(height),
+          boxSizing: "border-box",
+        },
+        layout: { kind: "freeform" },
+        children: document.roots,
+      },
+    ];
   }
   recoverContainment(document.roots);
   inferVisualLayout(document.roots, document.diagnostics);

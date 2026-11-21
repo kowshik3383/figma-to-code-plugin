@@ -38,6 +38,26 @@ function plainRectangle(node: DesignNode): boolean {
   );
 }
 
+function fitsRoundedRectangle(container: DesignNode, content: Bounds): boolean {
+  const bounds = container.visual.bounds;
+  const corner = Math.max(
+    0,
+    ...(container.style.borderRadius ?? "")
+      .split(" ")
+      .map((value) => Number.parseFloat(value) || 0),
+  );
+  const inset = Math.min(corner, Math.min(bounds.width, bounds.height) / 2);
+  return contains(
+    {
+      x: bounds.x + inset,
+      y: bounds.y + inset,
+      width: bounds.width - inset * 2,
+      height: bounds.height - inset * 2,
+    },
+    content,
+  );
+}
+
 function attach(container: DesignNode, child: DesignNode) {
   container.layout ??= { kind: "freeform" };
   container.style.position ??= "relative";
@@ -52,6 +72,7 @@ export function recoverContainment(nodes: DesignNode[], parent?: DesignNode) {
   if (
     !parent ||
     parent.visual.maskedStack ||
+    parent.visual.reverseOrder ||
     parent.layout?.kind === "flex" ||
     parent.layout?.kind === "grid"
   )
@@ -69,6 +90,7 @@ export function recoverContainment(nodes: DesignNode[], parent?: DesignNode) {
     (!background.style.borderRadius || parent.visual.clips)
   ) {
     parent.style.backgroundColor = background.style.backgroundColor;
+    parent.visual.fills = background.visual.fills;
     if (background.style.borderRadius)
       parent.style.borderRadius = background.style.borderRadius;
     nodes.splice(0, 1);
@@ -84,8 +106,7 @@ export function recoverContainment(nodes: DesignNode[], parent?: DesignNode) {
         if (!overlaps(candidate.visual.bounds, bounds)) continue;
         if (
           plainRectangle(candidate) &&
-          !candidate.style.borderRadius &&
-          contains(candidate.visual.bounds, bounds) &&
+          fitsRoundedRectangle(candidate, bounds) &&
           !contains(bounds, candidate.visual.bounds)
         ) {
           host = candidate;
@@ -288,6 +309,10 @@ export function inferVisualLayout(nodes: DesignNode[], diagnostics: string[]) {
         child.style.top = px(child.visual.bounds.y - node.visual.bounds.y);
       }
       child.style.position = "absolute";
+      if (child.visual.sizing.horizontal === "fill")
+        child.style.width = px(child.visual.bounds.width);
+      if (child.visual.sizing.vertical === "fill")
+        child.style.minHeight = px(child.visual.bounds.height);
     }
   }
 }

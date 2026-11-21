@@ -98,3 +98,179 @@ export function recoverContainment(nodes: DesignNode[], parent?: DesignNode) {
   }
   nodes.splice(0, nodes.length, ...remaining);
 }
+
+const tolerance = 2;
+const close = (a: number, b: number) => Math.abs(a - b) <= tolerance;
+
+function useFlow(child: DesignNode) {
+  delete child.style.position;
+  if (child.children.length) child.style.position = "relative";
+  delete child.style.left;
+  delete child.style.top;
+}
+
+function flexFromBounds(node: DesignNode, horizontal: boolean): boolean {
+  const start = (b: Bounds) => (horizontal ? b.x : b.y);
+  const end = horizontal ? right : bottom;
+  const crossStart = (b: Bounds) => (horizontal ? b.y : b.x);
+  const crossEnd = horizontal ? bottom : right;
+  const parent = node.visual.bounds;
+  const sorted = [...node.children].sort(
+    (a, b) => start(a.visual.bounds) - start(b.visual.bounds),
+  );
+  const boxes = sorted.map((child) => child.visual.bounds);
+  const first = boxes[0];
+  const last = boxes[boxes.length - 1];
+  const starts = boxes.map(crossStart);
+  const ends = boxes.map(crossEnd);
+  const crossMin = Math.min(...starts);
+  const crossMax = Math.max(...ends);
+  const center = boxes.every((b) =>
+    close(crossStart(b) + crossEnd(b), crossMin + crossMax),
+  );
+  const cross = starts.every((v) => close(v, crossMin))
+    ? "start"
+    : ends.every((v) => close(v, crossMax))
+      ? "end"
+      : center
+        ? "center"
+        : undefined;
+  const gaps = boxes.slice(1).map((b, i) => start(b) - end(boxes[i]));
+  if (!cross || gaps.some((g) => g < -0.5 || !close(g, gaps[0]))) return false;
+
+  const before = start(first) - start(parent);
+  const after = end(parent) - end(last);
+  const crossBefore = crossMin - crossStart(parent);
+  const crossAfter = crossEnd(parent) - crossMax;
+  const main =
+    !gaps.length && close(before, after)
+      ? "center"
+      : gaps.length > 0 &&
+          close(before, 0) &&
+          close(after, 0) &&
+          gaps[0] > tolerance
+        ? "space-between"
+        : "start";
+  const values = horizontal
+    ? [crossBefore, after, crossAfter, before]
+    : [before, crossAfter, after, crossBefore];
+  const padding = values.map((value) => px(Math.max(0, value))) as [
+    string,
+    string,
+    string,
+    string,
+  ];
+  node.layout = {
+    kind: "flex",
+    axis: horizontal ? "horizontal" : "vertical",
+    wrap: false,
+    main,
+    cross,
+    gap: main === "space-between" ? undefined : px(Math.max(0, gaps[0] ?? 0)),
+    padding,
+  };
+  node.children = sorted;
+  for (const child of sorted) useFlow(child);
+  return true;
+}
+
+function gridFromBounds(node: DesignNode): boolean {
+  const sorted = [...node.children].sort(
+    (a, b) =>
+      a.visual.bounds.y - b.visual.bounds.y ||
+      a.visual.bounds.x - b.visual.bounds.x,
+  );
+  const bands: DesignNode[][] = [];
+  for (const child of sorted) {
+    const band = bands.at(-1);
+    if (band && close(band[0].visual.bounds.y, child.visual.bounds.y))
+      band.push(child);
+    else bands.push([child]);
+  }
+  for (const band of bands)
+    band.sort((a, b) => a.visual.bounds.x - b.visual.bounds.x);
+  const columns = bands[0].map((child) => child.visual.bounds);
+  const rows = bands.map((band) => band[0].visual.bounds);
+  if (columns.length < 2 || rows.length < 2) return false;
+  if (
+    bands.some(
+      (band, row) =>
+        band.length !== columns.length ||
+        band.some(
+          ({ visual: { bounds: b } }, column) =>
+            !close(b.x, columns[column].x) ||
+            !close(b.width, columns[column].width) ||
+            !close(b.height, rows[row].height),
+        ),
+    )
+  )
+    return false;
+  const xGaps = columns.slice(1).map((b, i) => b.x - right(columns[i]));
+  const yGaps = rows.slice(1).map((b, i) => b.y - bottom(rows[i]));
+  if (
+    [xGaps, yGaps].some((gaps) =>
+      gaps.some((gap) => gap < 0 || !close(gap, gaps[0])),
+    )
+  )
+    return false;
+  const parent = node.visual.bounds;
+  node.style.padding = [
+    rows[0].y - parent.y,
+    right(parent) - right(columns.at(-1)!),
+    bottom(parent) - bottom(rows.at(-1)!),
+    columns[0].x - parent.x,
+  ]
+    .map((value) => px(Math.max(0, value)))
+    .join(" ");
+  node.layout = {
+    kind: "grid",
+    columns: columns.map(({ width }) => ({ kind: "fixed", pixels: width })),
+    rows: rows.map(({ height }) => ({ kind: "fixed", pixels: height })),
+    columnGap: px(xGaps[0]),
+    rowGap: px(yGaps[0]),
+  };
+  node.children = bands.flat();
+  node.children.forEach((child, index) => {
+    useFlow(child);
+    child.gridCell = {
+      row: Math.floor(index / columns.length),
+      column: index % columns.length,
+      rowSpan: 1,
+      columnSpan: 1,
+    };
+  });
+  return true;
+}
+
+export function inferVisualLayout(nodes: DesignNode[], diagnostics: string[]) {
+  for (const node of nodes) {
+    inferVisualLayout(node.children, diagnostics);
+    if (node.layout?.kind !== "freeform" || !node.children.length) continue;
+    if (
+      !node.style.transform &&
+      node.children.every(
+        (child) =>
+          contains(node.visual.bounds, child.visual.bounds) &&
+          !child.style.transform,
+      )
+    ) {
+      if (
+        flexFromBounds(node, true) ||
+        flexFromBounds(node, false) ||
+        gridFromBounds(node)
+      )
+        continue;
+    }
+    diagnostics.push(
+      `Unresolved layout on ${node.name} (${node.id}); preserving measured positions.`,
+    );
+    node.style.position ??= "relative";
+    for (const child of node.children) {
+      if (!node.style.transform && !child.style.transform) {
+        child.style.left = px(child.visual.bounds.x - node.visual.bounds.x);
+        child.style.top = px(child.visual.bounds.y - node.visual.bounds.y);
+      }
+      child.style.position = "absolute";
+    }
+  }
+}

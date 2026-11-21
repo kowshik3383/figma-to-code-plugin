@@ -431,6 +431,37 @@ it("merges a full background and nests a later overlay over its contained rectan
   expect(root.children.map(({ id }) => id)).toEqual(["card"]);
   expect(root.children[0].children[0]).toMatchObject({
     id: "overlay",
-    style: { left: "10px", top: "10px" },
   });
+});
+
+it("infers rows in visual order and a regular grid from badly ordered siblings", () => {
+  const block = (id: string, x: number, y: number) =>
+    layer(id, { x, y, width: 50, height: 25 });
+  const inferred = normalizeSelection([
+    row("unordered", [block("right", 80, 10), block("left", 10, 11)], {
+      layoutMode: "NONE",
+    }),
+    row(
+      "grid",
+      [
+        block("d", 80, 44),
+        block("a", 10, 10),
+        block("c", 10, 44),
+        block("b", 80, 10),
+      ],
+      { layoutMode: "NONE" },
+    ),
+  ]).document.roots;
+  expect(inferred[0].layout).toMatchObject({
+    kind: "flex",
+    axis: "horizontal",
+    gap: "20px",
+  });
+  expect(inferred[0].children.map(({ id }) => id)).toEqual(["left", "right"]);
+  expect(inferred[1].layout).toMatchObject({
+    kind: "grid",
+    columnGap: "20px",
+    rowGap: "9px",
+  });
+  expect(inferred[1].children[3].gridCell).toMatchObject({ row: 1, column: 1 });
 });

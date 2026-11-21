@@ -1,4 +1,4 @@
-import { recoverContainment } from "./visual";
+import { inferVisualLayout, recoverContainment } from "./visual";
 import { getImageFills } from "../common/images";
 import { describeAsset, visibleSelection } from "./assets";
 import type {
@@ -309,9 +309,6 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
         };
       } else if (node.children.some((child) => child.visible)) {
         layout = { kind: "freeform" };
-        document.diagnostics.push(
-          `Freeform layout on ${node.name} uses positioned children.`,
-        );
       }
       for (const [index, child] of node.children.entries()) {
         const converted = visit(child, node, depth + 1, index, bounds);
@@ -403,5 +400,6 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
     if (normalized) document.roots.push(normalized);
   }
   recoverContainment(document.roots);
+  inferVisualLayout(document.roots, document.diagnostics);
   return { document, sources };
 }

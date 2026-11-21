@@ -1,3 +1,4 @@
+import { flatDividerColor } from "./flatPng";
 import { fromUint8Array } from "js-base64";
 import {
   getCleanAssetFileName,
@@ -35,10 +36,53 @@ export function isContainerBackground(node: SceneNode): boolean {
   );
 }
 
+function vectorIcon(node: SceneNode): boolean {
+  if (
+    !("children" in node) ||
+    !node.children.length ||
+    !node.name.startsWith("@icon ")
+  )
+    return false;
+  const stack = [...node.children];
+  while (stack.length) {
+    const child = stack.pop()!;
+    if (!child.visible) continue;
+    if (
+      nodeHasImageFill(child) ||
+      child.type === "TEXT" ||
+      ("isMask" in child && child.isMask)
+    )
+      return false;
+    if ("children" in child) stack.push(...child.children);
+    else if (
+      !vectorTypes.has(child.type) &&
+      child.type !== "RECTANGLE" &&
+      child.type !== "ELLIPSE"
+    )
+      return false;
+  }
+  return true;
+}
+
+export function cssAssetColor(
+  node: SceneNode,
+  asset: DesignAsset,
+  bytes: Uint8Array,
+): string | undefined {
+  if (
+    asset.format !== "PNG" ||
+    node.name.startsWith("@alt ") ||
+    node.type === "TEXT" ||
+    Math.min(asset.width, asset.height) > 2
+  )
+    return;
+  return flatDividerColor(bytes);
+}
+
 export function describeAsset(node: SceneNode): DesignAsset | undefined {
   if ("isMask" in node && node.isMask) return;
   const image = nodeHasImageFill(node);
-  if (!image && !vectorTypes.has(node.type)) return;
+  if (!image && !vectorTypes.has(node.type) && !vectorIcon(node)) return;
   const format = image ? "PNG" : "SVG";
   return {
     id: node.id,
@@ -99,6 +143,7 @@ async function readOriginalPreview(
 export interface PreviewAssets {
   urls: Map<string, string>;
   renderedIds: Set<string>;
+  colors: Map<string, string>;
 }
 
 export async function resolvePreviewAssets(
@@ -109,6 +154,7 @@ export async function resolvePreviewAssets(
 ): Promise<PreviewAssets> {
   const urls = new Map<string, string>();
   const renderedIds = new Set<string>();
+  const colors = new Map<string, string>();
   let remaining = 1_500_000;
   for (const asset of documentAssets.slice(0, 40)) {
     if (remaining <= 0 || !isCurrent()) break;
@@ -117,6 +163,8 @@ export async function resolvePreviewAssets(
     try {
       const scale = Math.min(1, 600 / Math.max(asset.width, asset.height, 1));
       const bytes = await exportAsset(node, asset, scale);
+      const flat = scale === 1 ? cssAssetColor(node, asset, bytes) : undefined;
+      if (flat) colors.set(asset.id, flat);
       if (bytes.byteLength > remaining) continue;
       remaining -= bytes.byteLength;
       const mime = asset.format === "PNG" ? "image/png" : "image/svg+xml";
@@ -149,5 +197,5 @@ export async function resolvePreviewAssets(
     diagnostics.push(
       "Some assets could not be previewed. Export the project for full-size assets and export diagnostics.",
     );
-  return { urls, renderedIds };
+  return { urls, renderedIds, colors };
 }

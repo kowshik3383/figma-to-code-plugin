@@ -87,7 +87,7 @@ export function webGenerator(
   }
 
   return {
-    render(document, { assetUrl }) {
+    render(document, { assetUrl, assetColor }) {
       function renderNode(node: DesignNode, depth: number): string {
         const indent = "  ".repeat(depth);
         const style = { ...node.style, ...lowerLayout(node.layout) };
@@ -95,7 +95,13 @@ export function webGenerator(
           style.gridRow = `${node.gridCell.row + 1} / span ${node.gridCell.rowSpan}`;
           style.gridColumn = `${node.gridCell.column + 1} / span ${node.gridCell.columnSpan}`;
         }
-        const url = node.asset && assetUrl(node.asset);
+        const flat = node.asset && assetColor?.(node.asset);
+        if (flat) {
+          style.backgroundColor = flat;
+          if (node.asset?.placement === "image")
+            style.minHeight = `${node.asset.height}px`;
+        }
+        const url = !flat && node.asset && assetUrl(node.asset);
         const stringAttribute = (value: string) =>
           jsx ? `{${JSON.stringify(value)}}` : `"${escapeHTML(value)}"`;
         if (url && node.asset?.placement === "image") {

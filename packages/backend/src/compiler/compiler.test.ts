@@ -552,3 +552,51 @@ it("assigns stacking only where needed and maps rotation, blend, and multiple sh
   expect(b.style.boxShadow).toMatch(/^inset .*rgba\(0, 0, 0, 0.25\), 1px/);
   expect(c.style.zIndex).toBeUndefined();
 });
+
+it("replaces a uniform PNG divider with CSS and preserves nonuniform photos and annotated icons", async () => {
+  const decode = (data: string) =>
+    Uint8Array.from(atob(data), (character) => character.charCodeAt(0));
+  const divider = layer("divider", {
+    width: 16,
+    height: 2,
+    fills: [image()],
+    exportAsync: vi.fn<() => Promise<Uint8Array>>(async () =>
+      decode(
+        "iVBORw0KGgoAAAANSUhEUgAAABAAAAACCAYAAABR7VzxAAAAF0lEQVR4nGM0qjjxn4ECwESJZgYGBgYAN4ECdcKDnIkAAAAASUVORK5CYII=",
+      ),
+    ),
+  });
+  const detailed = layer("detailed", {
+    width: 16,
+    height: 2,
+    fills: [image()],
+    exportAsync: vi.fn<() => Promise<Uint8Array>>(async () =>
+      decode(
+        "iVBORw0KGgoAAAANSUhEUgAAABAAAAACCAYAAABR7VzxAAAAFklEQVR4nGM0qjjxn4ECwERIwQkC8gBQgQM91ZAWsQAAAABJRU5ErkJggg==",
+      ),
+    ),
+  });
+  const icon = row("icon", [layer("vector", { type: "VECTOR" })], {
+    name: "@icon Arrow",
+  });
+  const { document, sources } = normalizeSelection([divider, detailed, icon]);
+  const flat = new Map<string, string>();
+  const files = await collectProjectAssets(
+    document.assets,
+    sources,
+    [],
+    1000,
+    flat,
+  );
+  expect(flat.get("divider")).toBe("#3278c8");
+  expect(files.map(({ name }) => name)).toEqual([
+    "detailed-detailed.png",
+    "icon-arrow-icon.svg",
+  ]);
+  const html = webGenerator().render(document, {
+    assetColor: (asset) => flat.get(asset.id),
+    assetUrl: (asset) => asset.name,
+  });
+  expect(html).toContain("background-color: #3278c8");
+  expect(html).not.toContain("divider-divider.png");
+});

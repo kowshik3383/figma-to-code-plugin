@@ -3,6 +3,7 @@ import { getCleanAssetFileName } from "../common/images";
 import { postConversionComplete, postEmptyMessage } from "../messaging";
 import {
   exportAsset,
+  cssAssetColor,
   isContainerBackground,
   resolvePreviewAssets,
   toDetectedAsset,
@@ -34,7 +35,7 @@ export async function runDesignCompiler(
     return;
   }
   const parsed = Date.now();
-  const { urls, renderedIds } =
+  const { urls, renderedIds, colors } =
     sources.size <= 1200
       ? await resolvePreviewAssets(
           document.assets,
@@ -42,7 +43,11 @@ export async function runDesignCompiler(
           document.diagnostics,
           isCurrent,
         )
-      : { urls: new Map<string, string>(), renderedIds: new Set<string>() };
+      : {
+          urls: new Map<string, string>(),
+          renderedIds: new Set<string>(),
+          colors: new Map<string, string>(),
+        };
   if (!isCurrent()) return;
 
   let directory = "images";
@@ -61,6 +66,7 @@ export async function runDesignCompiler(
     jsx,
     tailwind: settings.framework === "Tailwind",
   }).render(document, {
+    assetColor: (asset) => colors.get(asset.id),
     assetUrl: (asset) => {
       const shouldEmbed =
         asset.format === "PNG" ? settings.embedImages : settings.embedVectors;
@@ -84,6 +90,7 @@ export async function runDesignCompiler(
     content:
       sources.size <= 1200
         ? webGenerator().render(document, {
+            assetColor: (asset) => colors.get(asset.id),
             assetUrl: (asset) => urls.get(asset.id),
           })
         : "",
@@ -116,6 +123,7 @@ export async function collectProjectAssets(
   sources: ReadonlyMap<string, SceneNode>,
   diagnostics: string[],
   maxBytes: number,
+  flatColors?: Map<string, string>,
 ) {
   const files = [];
   let bytesUsed = 0;
@@ -124,6 +132,11 @@ export async function collectProjectAssets(
     if (!node) continue;
     try {
       const bytes = await exportAsset(node, asset);
+      const flat = flatColors && cssAssetColor(node, asset, bytes);
+      if (flat) {
+        flatColors.set(asset.id, flat);
+        continue;
+      }
       if (bytesUsed + bytes.byteLength > maxBytes)
         throw new Error("Asset exceeds the remaining project byte budget.");
       bytesUsed += bytes.byteLength;

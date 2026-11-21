@@ -330,17 +330,20 @@ const downloadProject = async (format: DownloadProjectFormat) => {
   let artifacts: Parameters<typeof generateProjectZip>[6];
   if (supportsCompiler(pluginSettings)) {
     const { document, sources } = normalizeSelection(selection);
+    const flatColors = new Map<string, string>();
     assets = await collectProjectAssets(
       document.assets,
       sources,
       document.diagnostics,
       maxRawAssetSizeBytes,
+      flatColors,
     );
     const exported = new Map(assets.map((asset) => [asset.nodeId, asset.name]));
     code = webGenerator({
       jsx: format !== "html",
       tailwind: pluginSettings.framework === "Tailwind",
     }).render(document, {
+      assetColor: (asset) => flatColors.get(asset.id),
       assetUrl: (asset) => {
         const name = exported.get(asset.id);
         return name

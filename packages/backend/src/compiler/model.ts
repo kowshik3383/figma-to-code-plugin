@@ -114,6 +114,7 @@ export interface DesignDocument {
 }
 
 export interface RenderOptions {
+  assetColor?: (asset: DesignAsset) => string | undefined;
   assetUrl: (asset: DesignAsset) => string | undefined;
 }
 

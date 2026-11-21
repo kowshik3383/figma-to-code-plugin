@@ -23,10 +23,20 @@ export interface TailwindSettings extends HTMLSettings {
   baseFontFamily: string;
   fontFamilyCustomConfig: Record<string, string[]>;
 }
+export type OutputFormat = "framework" | "single-html" | "separate-html";
+export type DocumentDownloadFormat =
+  | "single-html"
+  | "separate-html"
+  | "html-assets";
+export type DownloadFormat = DownloadProjectFormat | DocumentDownloadFormat;
+
 export interface PluginSettings extends HTMLSettings, TailwindSettings {
   framework: Framework;
   useOldPluginVersion2025: boolean;
   designCompiler?: boolean;
+  outputFormat?: OutputFormat;
+  embedDocumentImages?: boolean;
+  linkGoogleFonts?: boolean;
   responsiveRoot: boolean;
 }
 export interface DetectedAsset {
@@ -49,6 +59,7 @@ export interface CompilationMetrics {
 // Messaging
 export interface ConversionData {
   code: string;
+  documentCss?: string;
   settings: PluginSettings;
   htmlPreview: HTMLPreview;
   colors: SolidColorConversion[];
@@ -98,6 +109,7 @@ export type ProjectZipMessage = Message & {
 };
 export type AssetDownloadMessage = Message & {
   type: "download-file";
+  project?: boolean;
   bytes: ArrayBuffer;
   fileName: string;
   mimeType: string;
@@ -219,6 +231,9 @@ export type LinearGradientConversion = {
 export interface HTMLPreview {
   size: { width: number; height: number };
   content: string;
+  fullDocument?: boolean;
+  useCode?: boolean;
+  allowRemoteFonts?: boolean;
 }
 
 export interface TailwindTextConversion {

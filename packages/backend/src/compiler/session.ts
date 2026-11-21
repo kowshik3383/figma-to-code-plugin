@@ -2,8 +2,6 @@ import type { PluginSettings } from "types";
 import { getCleanAssetFileName } from "../common/images";
 import { postConversionComplete, postEmptyMessage } from "../messaging";
 import {
-  exportAsset,
-  cssAssetColor,
   isContainerBackground,
   resolvePreviewAssets,
   toDetectedAsset,
@@ -11,9 +9,15 @@ import {
 import { projectAssetDirectory, projectAssetUrl } from "../zipGenerator";
 import type { DesignAsset } from "./model";
 import { normalizeSelection } from "./normalize";
+import { prepareHtmlExport } from "./htmlExport";
 import { webGenerator } from "./web";
 
 export function supportsCompiler(settings: PluginSettings): boolean {
+  if (
+    settings.outputFormat === "single-html" ||
+    settings.outputFormat === "separate-html"
+  )
+    return true;
   return (
     settings.designCompiler === true &&
     (settings.framework === "HTML"
@@ -35,8 +39,22 @@ export async function runDesignCompiler(
     return;
   }
   const parsed = Date.now();
+  const documentMode =
+    settings.outputFormat === "single-html" ||
+    settings.outputFormat === "separate-html";
+  const standalone = documentMode
+    ? await prepareHtmlExport(
+        document,
+        sources,
+        settings.outputFormat === "single-html" &&
+          settings.embedDocumentImages !== false,
+        settings.outputFormat === "separate-html",
+        isCurrent,
+        settings.linkGoogleFonts,
+      )
+    : undefined;
   const { urls, renderedIds, colors } =
-    sources.size <= 1200
+    !documentMode && sources.size <= 1200
       ? await resolvePreviewAssets(
           document.assets,
           sources,
@@ -62,24 +80,29 @@ export async function runDesignCompiler(
     settings.framework === "HTML"
       ? settings.htmlGenerationMode === "jsx"
       : settings.tailwindGenerationMode === "jsx";
-  const code = webGenerator({
-    jsx,
-    tailwind: settings.framework === "Tailwind",
-  }).render(document, {
-    assetColor: (asset) => colors.get(asset.id),
-    assetUrl: (asset) => {
-      const shouldEmbed =
-        asset.format === "PNG" ? settings.embedImages : settings.embedVectors;
-      return (
-        (shouldEmbed && renderedIds.has(asset.id) && urls.get(asset.id)) ||
-        projectAssetUrl(asset.name, "html", directory)
-      );
-    },
-  });
+  const code =
+    standalone?.html ??
+    webGenerator({
+      jsx,
+      tailwind: settings.framework === "Tailwind",
+    }).render(document, {
+      assetColor: (asset) => colors.get(asset.id),
+      assetUrl: (asset) => {
+        const shouldEmbed =
+          asset.format === "PNG" ? settings.embedImages : settings.embedVectors;
+        return (
+          (shouldEmbed && renderedIds.has(asset.id) && urls.get(asset.id)) ||
+          projectAssetUrl(asset.name, "html", directory)
+        );
+      },
+    });
   const roots = document.roots.map(
     ({ visual }) => visual.renderedBounds ?? visual.bounds,
   );
   const htmlPreview = {
+    fullDocument: Boolean(standalone),
+    allowRemoteFonts: Boolean(standalone && settings.linkGoogleFonts),
+    useCode: Boolean(standalone && !standalone.preview),
     size: {
       width: Math.max(1, ...roots.map((node) => node.width)),
       height: Math.max(
@@ -87,20 +110,23 @@ export async function runDesignCompiler(
         roots.reduce((sum, node) => sum + node.height, 0),
       ),
     },
-    content:
-      sources.size <= 1200
+    content: standalone
+      ? (standalone.preview ?? "")
+      : sources.size <= 1200
         ? webGenerator().render(document, {
             assetColor: (asset) => colors.get(asset.id),
             assetUrl: (asset) => urls.get(asset.id),
           })
         : "",
   };
-  if (sources.size > 1200)
+  if (!documentMode && sources.size > 1200)
     document.diagnostics.push(
       "Preview is disabled for selections over 1,200 layers.",
     );
   postConversionComplete({
     code,
+    documentCss:
+      settings.outputFormat === "separate-html" ? standalone?.css : undefined,
     htmlPreview,
     settings,
     colors: [],
@@ -118,37 +144,7 @@ export async function runDesignCompiler(
   });
 }
 
-export async function collectProjectAssets(
-  assets: readonly DesignAsset[],
-  sources: ReadonlyMap<string, SceneNode>,
-  diagnostics: string[],
-  maxBytes: number,
-  flatColors?: Map<string, string>,
-) {
-  const files = [];
-  let bytesUsed = 0;
-  for (const asset of assets) {
-    const node = sources.get(asset.id);
-    if (!node) continue;
-    try {
-      const bytes = await exportAsset(node, asset);
-      const flat = flatColors && cssAssetColor(node, asset, bytes);
-      if (flat) {
-        flatColors.set(asset.id, flat);
-        continue;
-      }
-      if (bytesUsed + bytes.byteLength > maxBytes)
-        throw new Error("Asset exceeds the remaining project byte budget.");
-      bytesUsed += bytes.byteLength;
-      files.push({ name: asset.name, bytes, nodeId: node.id });
-    } catch (error) {
-      diagnostics.push(
-        `Could not export ${node.name} (${node.id}): ${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-  }
-  return files;
-}
+export { collectProjectAssets } from "./assets";
 
 export function downloadAssetDescriptor(
   node: SceneNode,

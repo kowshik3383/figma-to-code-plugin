@@ -199,3 +199,37 @@ export async function resolvePreviewAssets(
     );
   return { urls, renderedIds, colors };
 }
+
+export async function collectProjectAssets(
+  assets: readonly DesignAsset[],
+  sources: ReadonlyMap<string, SceneNode>,
+  diagnostics: string[],
+  maxBytes: number,
+  flatColors?: Map<string, string>,
+  isCurrent = () => true,
+) {
+  const files = [];
+  let bytesUsed = 0;
+  for (const asset of assets) {
+    if (!isCurrent()) break;
+    const node = sources.get(asset.id);
+    if (!node) continue;
+    try {
+      const bytes = await exportAsset(node, asset);
+      const flat = flatColors && cssAssetColor(node, asset, bytes);
+      if (flat) {
+        flatColors.set(asset.id, flat);
+        continue;
+      }
+      if (bytesUsed + bytes.byteLength > maxBytes)
+        throw new Error("Asset exceeds the remaining project byte budget.");
+      bytesUsed += bytes.byteLength;
+      files.push({ name: asset.name, bytes, nodeId: node.id });
+    } catch (error) {
+      diagnostics.push(
+        `Could not export ${node.name} (${node.id}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+  return files;
+}

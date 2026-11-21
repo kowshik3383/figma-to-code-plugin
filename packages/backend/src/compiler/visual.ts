@@ -219,7 +219,7 @@ function gridFromBounds(node: DesignNode): boolean {
   );
   const bands: DesignNode[][] = [];
   for (const child of sorted) {
-    const band = bands.at(-1);
+    const band = bands[bands.length - 1];
     if (band && close(band[0].visual.bounds.y, child.visual.bounds.y))
       band.push(child);
     else bands.push([child]);
@@ -253,8 +253,8 @@ function gridFromBounds(node: DesignNode): boolean {
   const parent = node.visual.bounds;
   node.style.padding = [
     rows[0].y - parent.y,
-    right(parent) - right(columns.at(-1)!),
-    bottom(parent) - bottom(rows.at(-1)!),
+    right(parent) - right(columns[columns.length - 1]),
+    bottom(parent) - bottom(rows[rows.length - 1]),
     columns[0].x - parent.x,
   ]
     .map((value) => px(Math.max(0, value)))

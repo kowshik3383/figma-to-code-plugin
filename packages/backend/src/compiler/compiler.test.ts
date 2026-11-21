@@ -1,3 +1,6 @@
+import { parse } from "parse5";
+import { SingleFileHtmlEmitter } from "./singleFileHtml";
+import { prepareHtmlExport } from "./htmlExport";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { strFromU8, unzipSync } from "fflate";
 import { getImageFills } from "../common/images";
@@ -661,4 +664,149 @@ it("keeps measured overlap when native Auto Layout uses negative spacing", () =>
     zIndex: "1",
   });
   expect(parent.children[0].style.zIndex).toBe("2");
+});
+
+describe("standalone HTML exports", () => {
+  const date = new Date("2026-11-21T00:00:00Z");
+  const emitter = new SingleFileHtmlEmitter(date);
+  const renderOptions = { assetUrl: () => undefined };
+  const solid = [{ type: "SOLID", color: { r: 0.15, g: 0.36, b: 0.72 } }];
+  const card = () =>
+    row(
+      "card",
+      [
+        layer("Feature", { fills: solid, width: 80, height: 30, x: 12, y: 12 }),
+        layer("Feature copy", {
+          fills: solid,
+          width: 80,
+          height: 30,
+          x: 104,
+          y: 12,
+        }),
+      ],
+      {
+        name: "@article Feature card",
+        layoutMode: "NONE",
+        width: 200,
+        height: 54,
+      },
+    );
+
+  it.each([
+    ["simple card", card()],
+    [
+      "auto-layout page",
+      row("page", [card()], {
+        name: "Feature page",
+        layoutMode: "VERTICAL",
+        height: 100,
+      }),
+    ],
+    [
+      "overflowing frame",
+      row(
+        "overflow",
+        [
+          layer("Protruding tile", {
+            x: 80,
+            y: 45,
+            width: 70,
+            height: 36,
+            fills: solid,
+          }),
+        ],
+        {
+          name: "Overflowing frame",
+          layoutMode: "NONE",
+          width: 120,
+          height: 60,
+        },
+      ),
+    ],
+  ])("emits valid self-contained HTML for the %s", (name, frame) => {
+    const { document } = normalizeSelection([frame]);
+    const html = emitter.render(document, renderOptions);
+    const errors: string[] = [];
+    parse(html, { onParseError: ({ code }) => errors.push(code) });
+    expect(errors).toEqual([]);
+    expect(html.match(/<style>/g)).toHaveLength(1);
+    expect(html).not.toContain('<link rel="stylesheet"');
+    expect(html).toMatchSnapshot(name);
+  });
+
+  it("reuses one named class for repeated styles", () => {
+    const { document } = normalizeSelection([card()]);
+    const html = emitter.render(document, renderOptions);
+    expect(
+      html.match(/class="figma-article-feature-card__feature"/g),
+    ).toHaveLength(2);
+    expect(
+      html.match(/\.figma-article-feature-card__feature \{/g),
+    ).toHaveLength(1);
+  });
+
+  it("escapes a hostile frame name and keeps CSS inside one style block", () => {
+    const { document } = normalizeSelection([card()]);
+    document.roots[0].name = '--><img src=x onerror="alert(1)">';
+    document.tokens["--test-font"] =
+      '"</style><script>alert(1)</script>", sans-serif';
+    const html = emitter.render(document, renderOptions);
+    expect(html).not.toContain("<script>");
+    expect(html.match(/<\/style>/g)).toHaveLength(1);
+    expect(html).toContain("&lt;img");
+    const errors: string[] = [];
+    parse(html, { onParseError: ({ code }) => errors.push(code) });
+    expect(errors).toEqual([]);
+  });
+
+  it("links only supported non-system fonts when explicitly enabled", () => {
+    const { document } = normalizeSelection([card()]);
+    const layer = document.roots[0].children[0];
+    layer.visual.textMetrics = {
+      autoResize: "HEIGHT",
+      lineHeight: "normal",
+      letterSpacing: "normal",
+      fontFamily: '"DM Sans", sans-serif',
+    };
+    expect(
+      new SingleFileHtmlEmitter(date, true).render(document, renderOptions),
+    ).toContain("fonts.googleapis.com/css2?family=DM+Sans");
+    layer.visual.textMetrics.fontFamily = '"Arial", sans-serif';
+    expect(
+      new SingleFileHtmlEmitter(date, true).render(document, renderOptions),
+    ).not.toContain("fonts.googleapis.com");
+  });
+
+  it("embeds PNG and SVG or returns relative assets alongside a separate stylesheet", async () => {
+    const { document, sources } = normalizeSelection([
+      layer("photo", { fills: [image()] }),
+      layer("icon", { type: "VECTOR" }),
+    ]);
+    const embedded = await prepareHtmlExport(document, sources, true, false);
+    expect(embedded?.html).toContain("data:image/png;base64,");
+    expect(embedded?.html).toContain("data:image/svg+xml;base64,");
+    const separate = await prepareHtmlExport(document, sources, false, true);
+    expect(separate?.html).toContain('href="styles.css"');
+    expect(separate?.html).not.toContain("<style>");
+    expect(separate?.html).toContain("assets/photo-photo.png");
+    expect(separate?.preview).toContain("data:image/png;base64,");
+    expect(Object.keys(separate?.assets ?? {})).toEqual([
+      "assets/photo-photo.png",
+      "assets/icon-icon.svg",
+    ]);
+  });
+  it("warns when the embedded HTML crosses 2 MB", async () => {
+    const { document, sources } = normalizeSelection([
+      layer("large", {
+        fills: [image()],
+        exportAsync: vi.fn<() => Promise<Uint8Array>>(
+          async () => new Uint8Array(1_600_000),
+        ),
+      }),
+    ]);
+    await prepareHtmlExport(document, sources, true, false);
+    expect(document.diagnostics).toContainEqual(
+      expect.stringContaining("exceeds 2 MB"),
+    );
+  });
 });

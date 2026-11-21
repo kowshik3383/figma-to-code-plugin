@@ -7,7 +7,7 @@ import type {
   Style,
 } from "./model";
 
-const escapeHTML = (value: string) =>
+export const escapeHTML = (value: string) =>
   value.replace(
     /[&<>"']/g,
     (character) =>
@@ -19,7 +19,7 @@ const escapeHTML = (value: string) =>
         "'": "&#39;",
       })[character]!,
   );
-const cssName = (name: string) =>
+export const cssName = (name: string) =>
   name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 const css = (style: Style) =>
   Object.entries(style)
@@ -65,11 +65,18 @@ function lowerLayout(layout?: DesignLayout): Style {
 }
 
 export function webGenerator(
-  options: { jsx?: boolean; tailwind?: boolean } = {},
+  options: {
+    jsx?: boolean;
+    tailwind?: boolean;
+    initialDepth?: number;
+    classFor?: (node: DesignNode, style: Style) => string;
+  } = {},
 ): DesignGenerator {
   const { jsx, tailwind } = options;
 
-  function attributes(style: Style) {
+  function attributes(node: DesignNode, style: Style) {
+    if (options.classFor)
+      return ` class="${escapeHTML(options.classFor(node, style))}"`;
     const utilities: string[] = [];
     const inline: Style = {};
     for (const [key, value] of Object.entries(style)) {
@@ -115,21 +122,21 @@ export function webGenerator(
             height: "auto",
             minHeight: "0",
           };
-          return `${indent}<img src=${stringAttribute(url)} alt=${stringAttribute(alt)} width="${Math.max(1, node.asset.width)}" height="${Math.max(1, node.asset.height)}"${attributes(imgStyle)}${jsx ? " />" : ">"}`;
+          return `${indent}<img src=${stringAttribute(url)} alt=${stringAttribute(alt)} width="${Math.max(1, node.asset.width)}" height="${Math.max(1, node.asset.height)}"${attributes(node, imgStyle)}${jsx ? " />" : ">"}`;
         }
         if (url) {
           style.backgroundImage = `url(${JSON.stringify(url)})`;
           style.backgroundSize = "100% 100%";
           style.backgroundRepeat = "no-repeat";
         }
-        const start = `${indent}<${node.tag}${attributes(style)}>`;
+        const start = `${indent}<${node.tag}${attributes(node, style)}>`;
         if (node.text !== undefined)
           return `${start}${jsx ? `{${JSON.stringify(node.text)}}` : escapeHTML(node.text)}</${node.tag}>`;
         if (!node.children.length) return `${start}</${node.tag}>`;
         return `${start}\n${node.children.map((child) => renderNode(child, depth + 1)).join("\n")}\n${indent}</${node.tag}>`;
       }
       const roots = document.roots
-        .map((node) => renderNode(node, jsx ? 1 : 0))
+        .map((node) => renderNode(node, options.initialDepth ?? (jsx ? 1 : 0)))
         .join("\n");
       if (jsx) return `<>\n${roots}\n</>`;
       return roots;

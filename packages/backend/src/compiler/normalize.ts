@@ -1,4 +1,8 @@
-import { inferVisualLayout, recoverContainment } from "./visual";
+import {
+  inferVisualLayout,
+  recoverContainment,
+  resolveOverflow,
+} from "./visual";
 import { getImageFills } from "../common/images";
 import { describeAsset, visibleSelection } from "./assets";
 import type {
@@ -401,5 +405,6 @@ export function normalizeSelection(selection: readonly SceneNode[]) {
   }
   recoverContainment(document.roots);
   inferVisualLayout(document.roots, document.diagnostics);
+  resolveOverflow(document.roots, document.diagnostics);
   return { document, sources };
 }

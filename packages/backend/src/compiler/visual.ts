@@ -274,3 +274,46 @@ export function inferVisualLayout(nodes: DesignNode[], diagnostics: string[]) {
     }
   }
 }
+
+export function resolveOverflow(nodes: DesignNode[], diagnostics: string[]) {
+  function visit(node: DesignNode): Bounds {
+    const bounds = node.visual.bounds;
+    const children = node.children.map(visit);
+    if (node.visual.clips) {
+      node.style.overflow = "hidden";
+      // Clipping needs a bounded viewport even when flow children are taller.
+      node.style.height = px(bounds.height);
+      delete node.style.minHeight;
+      return bounds;
+    }
+    if (!children.length) return bounds;
+    const x = Math.min(bounds.x, ...children.map((child) => child.x));
+    const y = Math.min(bounds.y, ...children.map((child) => child.y));
+    const farRight = Math.max(right(bounds), ...children.map(right));
+    const farBottom = Math.max(bottom(bounds), ...children.map(bottom));
+    const extraWidth = farRight - bounds.x;
+    const extraHeight = farBottom - bounds.y;
+    if (extraWidth > bounds.width + 0.5 && node.layout?.kind === "freeform")
+      node.style.width = px(extraWidth);
+    if (extraHeight > bounds.height + 0.5)
+      node.style.minHeight = px(extraHeight);
+    if (
+      x < bounds.x - 0.5 ||
+      y < bounds.y - 0.5 ||
+      extraWidth > bounds.width + 0.5 ||
+      extraHeight > bounds.height + 0.5
+    ) {
+      diagnostics.push(
+        `Unclipped overflow on ${node.name} (${node.id}); check content outside the original frame.`,
+      );
+    }
+    node.visual.renderedBounds = {
+      x,
+      y,
+      width: farRight - x,
+      height: farBottom - y,
+    };
+    return node.visual.renderedBounds;
+  }
+  nodes.forEach(visit);
+}

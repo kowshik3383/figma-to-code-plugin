@@ -59,6 +59,7 @@ export interface Bounds {
 
 export interface VisualLayer {
   bounds: Bounds;
+  renderedBounds?: Bounds;
   type: string;
   order: number;
   clips: boolean;

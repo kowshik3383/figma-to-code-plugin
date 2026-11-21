@@ -465,3 +465,29 @@ it("infers rows in visual order and a regular grid from badly ordered siblings",
   });
   expect(inferred[1].children[3].gridCell).toMatchObject({ row: 1, column: 1 });
 });
+
+it("expands an overflowing freeform frame but bounds an explicitly clipped frame", () => {
+  const overflow = (id: string) =>
+    layer(id, { x: 450, y: 70, width: 100, height: 50 });
+  const { document } = normalizeSelection([
+    row("open", [overflow("loose")], { layoutMode: "NONE" }),
+    row("closed", [overflow("clipped")], {
+      layoutMode: "NONE",
+      clipsContent: true,
+    }),
+  ]);
+  expect(document.roots[0].style).toMatchObject({
+    width: "550px",
+    minHeight: "120px",
+  });
+  expect(document.roots[0].style.overflow).toBeUndefined();
+  expect(document.roots[1].style).toMatchObject({
+    overflow: "hidden",
+    height: "80px",
+  });
+  expect(
+    document.diagnostics.some((warning) =>
+      warning.includes("Unclipped overflow on @section Card (open)"),
+    ),
+  ).toBe(true);
+});

@@ -70,7 +70,9 @@ export async function runDesignCompiler(
       );
     },
   });
-  const roots = document.roots.map(({ id }) => sources.get(id)!);
+  const roots = document.roots.map(
+    ({ visual }) => visual.renderedBounds ?? visual.bounds,
+  );
   const htmlPreview = {
     size: {
       width: Math.max(1, ...roots.map((node) => node.width)),

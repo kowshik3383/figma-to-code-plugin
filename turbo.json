@@ -4,6 +4,14 @@
     "build": {
       "outputs": ["dist/**"]
     },
+    "plugin#build": {
+      "outputs": ["dist/**"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/*/src/**",
+        "$TURBO_ROOT$/packages/tsconfig/*.json"
+      ]
+    },
     "dev": {
       "cache": false,
       "persistent": true
@@ -11,7 +19,7 @@
     "test": {
       "outputs": [],
       "dependsOn": ["^build"],
-      "inputs": ["src/**/*.ts", "src/**/*.tsx"]
+      "inputs": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.snap"]
     },
     "type-check": {}
   }

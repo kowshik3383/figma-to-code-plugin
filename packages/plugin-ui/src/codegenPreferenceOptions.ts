@@ -3,6 +3,15 @@ import { LocalCodegenPreferenceOptions, SelectPreferenceOptions } from "types";
 export const preferenceOptions: LocalCodegenPreferenceOptions[] = [
   {
     itemType: "individual_select",
+    propertyName: "designCompiler",
+    label: "Design Compiler (beta)",
+    description:
+      "Generate HTML, React, or Tailwind from normalized design structure and auto-layout.",
+    isDefault: false,
+    includedLanguages: ["HTML", "Tailwind"],
+  },
+  {
+    itemType: "individual_select",
     propertyName: "useTailwind4",
     label: "Tailwind 4",
     description: "Enable Tailwind CSS version 4 features and syntax.",

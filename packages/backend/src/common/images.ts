@@ -1,7 +1,6 @@
 import { AltNode, ExportableNode } from "types";
-import { btoa } from "js-base64";
+import { fromUint8Array } from "js-base64";
 import { addWarning } from "./commonConversionWarnings";
-import { exportAsyncProxy } from "./exportAsyncProxy";
 
 export const PLACEHOLDER_IMAGE_DOMAIN = "https://placehold.co";
 
@@ -64,8 +63,14 @@ export const getImageSrc = async (
   }
 
   if (settings.embedImages) {
-    const base64 = await exportNodeAsBase64PNG(altNode, hasChildren);
-    if (base64) return base64;
+    try {
+      const base64 = await exportNodeAsBase64PNG(altNode, hasChildren);
+      if (base64) return base64;
+    } catch (error) {
+      addWarning(
+        `Could not embed ${node.name} (${node.id}): ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   const customPath = (settings.customImagePath || "images/")
@@ -92,7 +97,7 @@ export const getPlaceholderImage = (
 };
 
 export interface NodeWithFills {
-  fills?: ReadonlyArray<Paint> | PluginAPI["mixed"] | null;
+  fills?: unknown;
   isMask?: boolean;
   opacity?: number;
   [key: string]: unknown;
@@ -110,14 +115,22 @@ const fillIsActiveImage = (fill: unknown): fill is ImagePaint => {
 export const getImageFills = (
   node?: NodeWithFills | MinimalFillsMixin | SceneNode | null,
 ): ImagePaint[] => {
-  try {
-    if (!node || node.isMask || !node.fills || !Array.isArray(node.fills)) {
-      return [];
-    }
-    return (node.fills as Paint[]).filter(fillIsActiveImage);
-  } catch {
-    return [];
+  if (!node || ("isMask" in node && node.isMask)) return [];
+  const fills = "fills" in node ? node.fills : undefined;
+  if (Array.isArray(fills)) return fills.filter(fillIsActiveImage);
+
+  // Mixed text paints live on character ranges, not on the node-level fills array.
+  if (
+    "type" in node &&
+    node.type === "TEXT" &&
+    "getStyledTextSegments" in node &&
+    typeof node.getStyledTextSegments === "function"
+  ) {
+    return (node as TextNode)
+      .getStyledTextSegments(["fills"])
+      .flatMap((segment) => segment.fills.filter(fillIsActiveImage));
   }
+  return [];
 };
 
 export const nodeHasImageFill = (
@@ -126,96 +139,55 @@ export const nodeHasImageFill = (
 
 export const nodeHasMultipleFills = (
   node?: NodeWithFills | MinimalFillsMixin | SceneNode | null,
-): boolean => Array.isArray(node?.fills) && (node?.fills?.length ?? 0) > 1;
+): boolean =>
+  !!node &&
+  "fills" in node &&
+  Array.isArray(node.fills) &&
+  node.fills.length > 1;
 
-const imageBytesToBase64 = (bytes: Uint8Array): string => {
-  // Convert Uint8Array to binary string
-  const binaryString = bytes.reduce((data, byte) => {
-    return data + String.fromCharCode(byte);
-  }, "");
-
-  // Encode binary string to base64
-  const b64 = btoa(binaryString);
-
-  return `data:image/png;base64,${b64}`;
-};
-
-const exportWithHiddenChildren = async <T>(
+export async function renderImage(
   node: SceneNode,
   excludeChildren: boolean,
-  exportNode: () => Promise<T>,
-): Promise<T> => {
-  const parent = node as SceneNode & Partial<ChildrenMixin>;
-  const children =
-    excludeChildren && "children" in parent && parent.children
-      ? [...parent.children]
-      : [];
-  const originalVisibility = new Map(
-    children.map((child) => [child, child.visible]),
-  );
-
-  try {
-    for (const child of children) {
-      child.visible = false;
-    }
-    return await exportNode();
-  } finally {
-    for (const child of children) {
-      child.visible = originalVisibility.get(child) ?? false;
-    }
-  }
-};
-
-export const exportNodeAsBase64PNG = async <T extends ExportableNode>(
-  node: AltNode<T>,
-  excludeChildren: boolean,
-) => {
-  // Shorcut export if the node has already been converted.
-  if (node.base64 !== undefined && node.base64 !== "") {
-    return node.base64;
-  }
-
-  const n: ExportableNode = node;
-
-  // export the image as bytes
-  const exportSettings: ExportSettingsImage = {
-    format: "PNG",
-    constraint: { type: "SCALE", value: 1 },
-  };
-  const bytes = await exportWithHiddenChildren(n, excludeChildren, () =>
-    exportAsyncProxy(n, exportSettings),
-  );
-
-  addWarning("Some images exported as Base64 PNG");
-
-  // Encode binary string to base64
-  const base64 = imageBytesToBase64(bytes);
-  // Save the value so it's only calculated once.
-  node.base64 = base64;
-  return base64;
-};
-
-export const exportNodeAsPNG = async (
-  node: SceneNode & ExportMixin,
-  excludeChildren: boolean,
-): Promise<Uint8Array> => {
-  return exportWithHiddenChildren(node, excludeChildren, () =>
-    node.exportAsync({
-      format: "PNG",
-      constraint: { type: "SCALE", value: 1 },
-    }),
-  );
-};
-
-export const exportNodeAsPNGWithScale = async (
-  node: SceneNode & ExportMixin,
-  excludeChildren: boolean,
   scale = 1,
-): Promise<Uint8Array> => {
-  return exportWithHiddenChildren(node, excludeChildren, () =>
-    node.exportAsync({
+): Promise<Uint8Array> {
+  let surface: RectangleNode | undefined;
+  try {
+    if (
+      excludeChildren &&
+      node.type !== "BOOLEAN_OPERATION" &&
+      "fills" in node &&
+      Array.isArray(node.fills)
+    ) {
+      // An isolated rectangle preserves the fill stack and local crop coordinates.
+      // An off-canvas temporary layer avoids changing source visibility or auto-layout.
+      surface = figma.createRectangle();
+      surface.x = -100000;
+      surface.y = -100000;
+      surface.resize(Math.max(0.01, node.width), Math.max(0.01, node.height));
+      surface.fills = node.fills;
+    }
+    const bytes = await (surface ?? node).exportAsync({
       format: "PNG",
       constraint: { type: "SCALE", value: scale },
-    }),
-  );
-};
+    });
+    if (!bytes.byteLength) throw new Error("Figma returned an empty PNG.");
+    return bytes;
+  } finally {
+    surface?.remove();
+  }
+}
+
+export async function exportNodeAsBase64PNG<T extends ExportableNode>(
+  node: AltNode<T>,
+  excludeChildren: boolean,
+) {
+  if (node.base64) return node.base64;
+  const source = await figma.getNodeByIdAsync(node.id);
+  if (!source || source.type === "DOCUMENT" || source.type === "PAGE") {
+    throw new Error("Image layer is no longer available.");
+  }
+  const bytes = await renderImage(source, excludeChildren);
+  node.base64 = `data:image/png;base64,${fromUint8Array(bytes)}`;
+  addWarning("Some images exported as Base64 PNG");
+  return node.base64;
+}

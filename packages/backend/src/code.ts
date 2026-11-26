@@ -14,6 +14,8 @@ import {
 } from "./messaging";
 import { DetectedAsset, PluginSettings } from "types";
 import { nodeHasImageFill } from "./common/images";
+import { visibleSelection } from "./compiler/assets";
+import { runDesignCompiler, supportsCompiler } from "./compiler/session";
 import { convertToCode } from "./common/retrieveUI/convertToCode";
 import { generateHTMLPreview } from "./html/htmlMain";
 import { oldConvertNodesToAltNodes } from "./altNodes/oldAltConversion";
@@ -28,15 +30,16 @@ import {
   resetPerformanceCounters,
 } from "./altNodes/jsonNodeConversion";
 
-export const run = async (settings: PluginSettings) => {
+export const run = async (settings: PluginSettings, isCurrent = () => true) => {
   resetPerformanceCounters();
   clearWarnings();
 
-  const { framework, useOldPluginVersion2025 } = settings;
-  const selection = figma.currentPage.selection;
+  const selection = visibleSelection(figma.currentPage.selection);
+  if (supportsCompiler(settings))
+    return runDesignCompiler(selection, settings, isCurrent);
 
   if (selection.length === 0) {
-    postEmptyMessage();
+    if (isCurrent()) postEmptyMessage();
     return;
   }
 
@@ -59,12 +62,47 @@ export const run = async (settings: PluginSettings) => {
 
   const nodeCount = countNodes(selection);
   if (nodeCount > MAX_NODE_COUNT_HARD) {
-    postError(
-      `Selection too large (${nodeCount} nodes). Please select a smaller frame.`,
-    );
+    if (isCurrent())
+      postError(
+        `Selection too large (${nodeCount} nodes). Please select a smaller frame.`,
+      );
     return;
   }
-  const skipHeavyUI = nodeCount > MAX_NODE_COUNT_PREVIEW;
+  const assets = detectAssetsInSelection(selection);
+  try {
+    await runCompatibility(
+      selection,
+      settings,
+      assets,
+      nodeCount,
+      MAX_NODE_COUNT_PREVIEW,
+      isCurrent,
+    );
+  } catch (error) {
+    if (!isCurrent()) return;
+    if (!assets.length) throw error;
+    postConversionComplete({
+      code: "// Code generation failed. You can still download assets below.",
+      htmlPreview: { size: { width: 0, height: 0 }, content: "" },
+      settings,
+      colors: [],
+      gradients: [],
+      assets,
+      warnings: [error instanceof Error ? error.message : String(error)],
+    });
+  }
+};
+
+async function runCompatibility(
+  selection: readonly SceneNode[],
+  settings: PluginSettings,
+  assets: DetectedAsset[],
+  nodeCount: number,
+  previewLimit: number,
+  isCurrent: () => boolean,
+) {
+  const { framework, useOldPluginVersion2025 } = settings;
+  const skipHeavyUI = nodeCount > previewLimit;
   if (skipHeavyUI) {
     addWarning(
       `Large selection (${nodeCount} nodes). HTML preview and colors are disabled to avoid memory issues.`,
@@ -74,52 +112,23 @@ export const run = async (settings: PluginSettings) => {
   // Timing with Date.now() instead of console.time
   const nodeToJSONStart = Date.now();
 
-  let convertedSelection: any;
-  if (useOldPluginVersion2025) {
-    convertedSelection = oldConvertNodesToAltNodes(selection, null);
-    console.log(
-      "[debug] convertedSelection count (old conversion):",
-      convertedSelection.length,
-    );
-  } else {
-    convertedSelection = await nodesToJSON(selection, settings);
-    console.log(`[benchmark] nodesToJSON: ${Date.now() - nodeToJSONStart}ms`);
-    console.log("[debug] convertedSelection count:", convertedSelection.length);
-    // const removeParentRecursive = (obj: any): any => {
-    //   if (Array.isArray(obj)) {
-    //     return obj.map(removeParentRecursive);
-    //   }
-    //   if (obj && typeof obj === 'object') {
-    //     const newObj = { ...obj };
-    //     delete newObj.parent;
-    //     for (const key in newObj) {
-    //       newObj[key] = removeParentRecursive(newObj[key]);
-    //     }
-    //     return newObj;
-    //   }
-    //   return obj;
-    // };
-    // console.log("nodeJson without parent refs:", removeParentRecursive(convertedSelection));
-  }
+  const convertedSelection = (useOldPluginVersion2025
+    ? oldConvertNodesToAltNodes(selection, null)
+    : await nodesToJSON(selection, settings)) as unknown as SceneNode[];
+  if (!isCurrent()) return;
 
-  if (convertedSelection.length > 0) {
-    console.log("[debug] first convertedSelection summary:", {
-      id: convertedSelection[0]?.id,
-      type: convertedSelection[0]?.type,
-      name: convertedSelection[0]?.name,
-      childCount: convertedSelection[0]?.children?.length ?? 0,
-    });
-  }
-
-  // ignore when nothing was selected
-  // If the selection was empty, the converted selection will also be empty.
-  if (convertedSelection.length === 0) {
+  if (!convertedSelection.length) {
+    if (assets.length)
+      throw new Error("No layers were available for code generation.");
     postEmptyMessage();
     return;
   }
 
   const convertToCodeStart = Date.now();
   const code = await convertToCode(convertedSelection, settings);
+  if (!isCurrent()) return;
+  if (!code.trim() && assets.length)
+    throw new Error("The selection produced no code.");
   console.log(
     `[benchmark] convertToCode: ${Date.now() - convertToCodeStart}ms`,
   );
@@ -166,7 +175,10 @@ export const run = async (settings: PluginSettings) => {
     }ms)`,
   );
 
-  const assets = detectAssetsInSelection(convertedSelection || selection);
+  if (!isCurrent()) return;
+  const supplemental = detectAssetsInSelection(convertedSelection);
+  const known = new Set(assets.map(({ id }) => id));
+  assets.push(...supplemental.filter(({ id }) => !known.has(id)));
   const totalTimeMs = Date.now() - nodeToJSONStart;
   const parseTimeMs = convertToCodeStart - nodeToJSONStart;
   const codegenTimeMs = Date.now() - convertToCodeStart;
@@ -186,7 +198,7 @@ export const run = async (settings: PluginSettings) => {
       totalTimeMs,
     },
   });
-};
+}
 
 export const detectAssetsInSelection = (
   nodes: readonly SceneNode[],
@@ -198,7 +210,7 @@ export const detectAssetsInSelection = (
     ["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"].includes(type);
 
   const visit = (node: SceneNode) => {
-    if (node.visible === false) return;
+    if (node.visible === false || ("isMask" in node && node.isMask)) return;
 
     if (!seenIds.has(node.id)) {
       if (nodeHasImageFill(node)) {

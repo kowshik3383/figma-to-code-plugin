@@ -23,9 +23,20 @@ export interface TailwindSettings extends HTMLSettings {
   baseFontFamily: string;
   fontFamilyCustomConfig: Record<string, string[]>;
 }
+export type OutputFormat = "framework" | "single-html" | "separate-html";
+export type DocumentDownloadFormat =
+  | "single-html"
+  | "separate-html"
+  | "html-assets";
+export type DownloadFormat = DownloadProjectFormat | DocumentDownloadFormat;
+
 export interface PluginSettings extends HTMLSettings, TailwindSettings {
   framework: Framework;
   useOldPluginVersion2025: boolean;
+  designCompiler?: boolean;
+  outputFormat?: OutputFormat;
+  embedDocumentImages?: boolean;
+  linkGoogleFonts?: boolean;
   responsiveRoot: boolean;
 }
 export interface DetectedAsset {
@@ -48,6 +59,7 @@ export interface CompilationMetrics {
 // Messaging
 export interface ConversionData {
   code: string;
+  documentCss?: string;
   settings: PluginSettings;
   htmlPreview: HTMLPreview;
   colors: SolidColorConversion[];
@@ -67,7 +79,7 @@ export interface UIMessage {
   pluginMessage: Message;
 }
 export type EmptyMessage = Message & { type: "empty" };
-export type ConversionStartMessage = Message & { type: "conversionStarted" };
+export type ConversionStartMessage = Message & { type: "conversionStart" };
 export type ConversionMessage = Message & {
   type: "code";
 } & ConversionData;
@@ -94,6 +106,17 @@ export type ProjectZipMessage = Message & {
   zip: ArrayBuffer;
   format: DownloadProjectFormat;
   fileName: string;
+};
+export type AssetDownloadMessage = Message & {
+  type: "download-file";
+  project?: boolean;
+  bytes: ArrayBuffer;
+  fileName: string;
+  mimeType: string;
+};
+export type AssetExportErrorMessage = Message & {
+  type: "asset-export-error";
+  error: string;
 };
 export type ProjectDownloadErrorMessage = Message & {
   type: "project-download-error";
@@ -208,6 +231,9 @@ export type LinearGradientConversion = {
 export interface HTMLPreview {
   size: { width: number; height: number };
   content: string;
+  fullDocument?: boolean;
+  useCode?: boolean;
+  allowRemoteFonts?: boolean;
 }
 
 export interface TailwindTextConversion {

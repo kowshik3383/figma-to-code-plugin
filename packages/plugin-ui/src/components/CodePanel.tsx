@@ -1,6 +1,7 @@
 import {
   Framework,
-  DownloadProjectFormat,
+  DownloadFormat,
+  OutputFormat,
   LocalCodegenPreferenceOptions,
   PluginSettings,
   SelectPreferenceOptions,
@@ -18,6 +19,8 @@ import CustomImagePathInput from "./CustomImagePathInput";
 
 interface CodePanelProps {
   code: string;
+  documentCss?: string;
+  documentPreview?: string;
   selectedFramework: Framework;
   settings: PluginSettings | null;
   preferenceOptions: LocalCodegenPreferenceOptions[];
@@ -26,12 +29,13 @@ interface CodePanelProps {
     key: keyof PluginSettings,
     value: PluginSettings[keyof PluginSettings],
   ) => void;
-  onDownloadProject?: (format: DownloadProjectFormat) => void;
+  onDownloadProject?: (format: DownloadFormat) => void;
   isDownloadingProject?: boolean;
   projectDownloadError?: string | null;
 }
 
 const CodePanel = (props: CodePanelProps) => {
+  const [view, setView] = useState<"all" | "style" | "body">("all");
   const [syntaxHovered, setSyntaxHovered] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const initialLinesToShow = 25;
@@ -47,6 +51,23 @@ const CodePanel = (props: CodePanelProps) => {
     projectDownloadError,
   } = props;
   const isCodeEmpty = code === "";
+  const format = settings?.outputFormat ?? "framework";
+  const documentMode = format !== "framework";
+  const references = settings?.embedDocumentImages === false;
+  const controlStyle =
+    "rounded-md border border-border bg-background px-2 py-1 text-xs";
+  const openPreview = () => {
+    if (!props.documentPreview) return;
+    const url = URL.createObjectURL(
+      new Blob([props.documentPreview], { type: "text/html;charset=utf-8" }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
 
   // Helper function to add the prefix before every class (or className) in the code.
   // It finds every occurrence of class="..." or className="..." and, for each class,
@@ -83,22 +104,40 @@ const CodePanel = (props: CodePanelProps) => {
 
   // If the selected framework is Tailwind and a prefix is provided then transform the code.
   const prefixedCode =
+    !documentMode &&
     selectedFramework === "Tailwind" &&
     settings?.customTailwindPrefix?.trim() !== ""
       ? applyPrefixToClasses(code, settings?.customTailwindPrefix)
       : code;
 
-  // Memoize the line count calculation to improve performance for large code blocks
-  const lineCount = useMemo(
-    () => prefixedCode.split("\n").length,
-    [prefixedCode],
+  const viewedCode =
+    documentMode && view === "style"
+      ? (props.documentCss ??
+        code.match(/<style>([\s\S]*?)<\/style>/)?.[1]?.trim() ??
+        "")
+      : documentMode && view === "body"
+        ? (code.match(/<body>([\s\S]*?)<\/body>/)?.[1]?.trim() ?? "")
+        : prefixedCode;
+
+  const highlightedCode = useMemo(
+    () =>
+      documentMode
+        ? viewedCode.replace(
+            /(data:image\/[^;,]+;base64,[A-Za-z0-9+/]{80})[A-Za-z0-9+/=]{256,}/g,
+            "$1…",
+          )
+        : viewedCode,
+    [documentMode, viewedCode],
   );
+
+  // Memoize the line count calculation to improve performance for large code blocks
+  const lineCount = useMemo(() => viewedCode.split("\n").length, [viewedCode]);
 
   // Determine if code should be truncated
   const shouldTruncate = !isExpanded && lineCount > initialLinesToShow;
   const displayedCode = shouldTruncate
-    ? truncateCode(prefixedCode, initialLinesToShow)
-    : prefixedCode;
+    ? truncateCode(highlightedCode, initialLinesToShow)
+    : highlightedCode;
   const showMoreButton = lineCount > initialLinesToShow;
   const showCodeCopyButton = lineCount > 5;
   const canDownloadProject =
@@ -149,13 +188,107 @@ const CodePanel = (props: CodePanelProps) => {
 
   return (
     <div className="w-full flex flex-col gap-2.5">
+      <label className="flex items-center justify-between gap-2 text-xs">
+        Output format
+        <select
+          className={controlStyle}
+          value={format}
+          onChange={(event) => {
+            setView("all");
+            onPreferenceChanged(
+              "outputFormat",
+              event.currentTarget.value as OutputFormat,
+            );
+          }}
+        >
+          <option value="single-html">Single HTML file</option>
+          <option value="separate-html">Separate HTML + CSS files</option>
+          <option value="framework">Framework options</option>
+        </select>
+      </label>
+      {format === "single-html" && (
+        <label className="flex items-center justify-between gap-2 text-xs">
+          Images
+          <select
+            className={controlStyle}
+            value={references ? "reference" : "embed"}
+            onChange={(event) =>
+              onPreferenceChanged(
+                "embedDocumentImages",
+                event.currentTarget.value === "embed",
+              )
+            }
+          >
+            <option value="embed">Embed images</option>
+            <option value="reference">Reference files (assets/)</option>
+          </select>
+        </label>
+      )}
+      {documentMode && (
+        <label className="flex items-center gap-2 text-xs">
+          <input
+            type="checkbox"
+            checked={settings?.linkGoogleFonts === true}
+            onChange={(event) =>
+              onPreferenceChanged(
+                "linkGoogleFonts",
+                event.currentTarget.checked,
+              )
+            }
+          />
+          Load supported Google Fonts online
+        </label>
+      )}
+      {documentMode && !isCodeEmpty && (
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            className={controlStyle}
+            aria-label="Code section"
+            value={view}
+            onChange={(event) =>
+              setView(event.currentTarget.value as typeof view)
+            }
+          >
+            <option value="all">Full document</option>
+            <option value="style">Style only</option>
+            <option value="body">Body only</option>
+          </select>
+          {onDownloadProject && (
+            <button
+              className={controlStyle}
+              disabled={isDownloadingProject}
+              onClick={() => onDownloadProject(format)}
+            >
+              {format === "single-html"
+                ? "Download .html"
+                : "Download HTML + CSS"}
+            </button>
+          )}
+          {format === "single-html" && references && onDownloadProject && (
+            <button
+              className={controlStyle}
+              disabled={isDownloadingProject}
+              onClick={() => onDownloadProject("html-assets")}
+            >
+              Download assets ZIP
+            </button>
+          )}
+          <button
+            className={controlStyle}
+            disabled={!props.documentPreview}
+            onClick={openPreview}
+          >
+            Open in new tab
+          </button>
+        </div>
+      )}
       <div className="flex items-center justify-between w-full">
         <h2 className="text-xs font-semibold text-foreground tracking-tight">
           Code Output
         </h2>
         {!isCodeEmpty && (
           <div className="flex items-center gap-1.5">
-            {onDownloadProject && canDownloadProject && (
+            {!documentMode && onDownloadProject && canDownloadProject && (
               <DownloadMenu
                 framework={selectedFramework}
                 onDownload={onDownloadProject}
@@ -163,7 +296,7 @@ const CodePanel = (props: CodePanelProps) => {
               />
             )}
             <CopyButton
-              value={prefixedCode}
+              value={viewedCode}
               onMouseEnter={handleButtonHover}
               onMouseLeave={handleButtonLeave}
             />
@@ -171,6 +304,12 @@ const CodePanel = (props: CodePanelProps) => {
         )}
       </div>
 
+      {highlightedCode !== viewedCode && (
+        <p className="text-xs text-muted-foreground">
+          Embedded image data is shortened in the code view. Copy includes the
+          full data.
+        </p>
+      )}
       {projectDownloadError && (
         <p
           className="text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded-md p-2"
@@ -180,7 +319,7 @@ const CodePanel = (props: CodePanelProps) => {
         </p>
       )}
 
-      {!isCodeEmpty && (
+      {!documentMode && !isCodeEmpty && (
         <div className="flex flex-col p-3 bg-card border border-border rounded-xl text-sm shadow-xs">
           {/* Essential settings always shown */}
           <SettingsGroup
@@ -266,7 +405,7 @@ const CodePanel = (props: CodePanelProps) => {
             {showCodeCopyButton && (
               <div className="pointer-events-none sticky top-3 z-10 h-0">
                 <CopyButton
-                  value={prefixedCode}
+                  value={viewedCode}
                   showLabel={false}
                   onMouseEnter={handleButtonHover}
                   onMouseLeave={handleButtonLeave}
@@ -276,14 +415,18 @@ const CodePanel = (props: CodePanelProps) => {
             )}
             <SyntaxHighlighter
               language={
-                (selectedFramework === "HTML" &&
-                  settings?.htmlGenerationMode === "styled-components") ||
-                (selectedFramework === "Tailwind" &&
-                  settings?.tailwindGenerationMode === "jsx") ||
-                (selectedFramework === "HTML" &&
-                  settings?.htmlGenerationMode === "jsx")
-                  ? "jsx"
-                  : "html"
+                documentMode
+                  ? view === "style"
+                    ? "css"
+                    : "html"
+                  : (selectedFramework === "HTML" &&
+                        settings?.htmlGenerationMode === "styled-components") ||
+                      (selectedFramework === "Tailwind" &&
+                        settings?.tailwindGenerationMode === "jsx") ||
+                      (selectedFramework === "HTML" &&
+                        settings?.htmlGenerationMode === "jsx")
+                    ? "jsx"
+                    : "html"
               }
               style={theme}
               customStyle={{

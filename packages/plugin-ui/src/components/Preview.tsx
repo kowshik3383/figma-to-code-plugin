@@ -16,26 +16,33 @@ const Preview: React.FC<{
   bgColor: "white" | "black";
   setBgColor: React.Dispatch<React.SetStateAction<"white" | "black">>;
 }> = (props) => {
-  const { htmlPreview, expanded, setExpanded, viewMode, bgColor, setBgColor } =
-    props;
+  const {
+    htmlPreview,
+    expanded,
+    setExpanded,
+    viewMode,
+    setViewMode,
+    bgColor,
+    setBgColor,
+  } = props;
 
   // Define consistent dimensions regardless of mode
   const containerWidth = expanded ? 320 : 240;
   const containerHeight = expanded ? 180 : 120;
 
   // Calculate scale factor first to use in content width calculation
+  const viewportWidth =
+    viewMode === "mobile"
+      ? 375
+      : viewMode === "desktop"
+        ? 1280
+        : Math.max(1, htmlPreview.size.width);
+  const viewportHeight = Math.max(1, htmlPreview.size.height);
   const scaleFactor = Math.min(
-    containerWidth / htmlPreview.size.width,
-    containerHeight / htmlPreview.size.height,
+    1,
+    containerWidth / viewportWidth,
+    containerHeight / viewportHeight,
   );
-
-  // Calculate content dimensions based on view mode
-  const contentWidth =
-    viewMode === "desktop"
-      ? containerWidth
-      : viewMode === "mobile"
-        ? Math.floor(containerWidth * 0.4) // Narrower for mobile
-        : htmlPreview.size.width * scaleFactor + 2; // I don't know why I need the 2, but it works always. I guess rounding error for zoom.
 
   return (
     <div className="flex flex-col w-full bg-card rounded-xl border border-border shadow-xs overflow-hidden">
@@ -46,6 +53,18 @@ const Preview: React.FC<{
           Preview
         </h3>
         <div className="flex items-center gap-1">
+          <select
+            aria-label="Preview viewport"
+            value={viewMode}
+            onChange={(event) =>
+              setViewMode(event.currentTarget.value as typeof viewMode)
+            }
+            className="rounded border border-border bg-card text-xs"
+          >
+            <option value="precision">Design width</option>
+            <option value="mobile">Mobile (375 px)</option>
+            <option value="desktop">Desktop (1280 px)</option>
+          </select>
           {/* Background Color Toggle */}
           <Button
             variant="ghost"
@@ -91,13 +110,8 @@ const Preview: React.FC<{
           <div
             className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
             style={{
-              width: contentWidth,
-              height:
-                viewMode === "mobile"
-                  ? Math.min(containerHeight * 0.9, containerHeight)
-                  : viewMode === "precision"
-                    ? htmlPreview.size.height * scaleFactor
-                    : containerHeight,
+              width: viewportWidth * scaleFactor,
+              height: viewportHeight * scaleFactor,
               transition: "width 0.3s ease, height 0.3s ease",
             }}
           >
@@ -111,31 +125,27 @@ const Preview: React.FC<{
             >
               {/* Content */}
               <div className="w-full h-full flex justify-center items-center">
-                <div
+                <iframe
+                  title="Generated design preview"
+                  sandbox=""
                   style={{
-                    zoom: scaleFactor,
-                    width:
-                      viewMode === "precision"
-                        ? htmlPreview.size.width
-                        : "100%",
-                    height:
-                      viewMode === "precision"
-                        ? htmlPreview.size.height
-                        : "100%",
-                    transformOrigin: "center",
-                    maxWidth: "100%",
-                    maxHeight: "100%",
-                    aspectRatio:
-                      viewMode === "precision"
-                        ? `${htmlPreview.size.width} / ${htmlPreview.size.height}`
-                        : undefined,
-                    transition: "all 0.3s ease",
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: viewportWidth,
+                    height: viewportHeight,
+                    transform: `scale(${scaleFactor})`,
+                    transformOrigin: "top left",
+                    border: 0,
                   }}
-                  dangerouslySetInnerHTML={{
-                    __html: replaceExternalImagesWithCanvas(
-                      htmlPreview.content,
-                    ),
-                  }}
+                  srcDoc={
+                    htmlPreview.fullDocument
+                      ? htmlPreview.content.replace(
+                          "<head>",
+                          `<head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'${htmlPreview.allowRemoteFonts ? " https://fonts.googleapis.com; font-src https://fonts.gstatic.com" : ""}">`,
+                        )
+                      : `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'"><style>body{margin:0}</style></head><body>${replaceExternalImagesWithCanvas(htmlPreview.content)}</body></html>`
+                  }
                 />
               </div>
             </div>
@@ -146,8 +156,7 @@ const Preview: React.FC<{
       {/* Footer with size info */}
       <div className="px-3 py-1.5 text-[11px] font-mono text-muted-foreground flex items-center justify-between border-t border-border bg-card/30">
         <span>
-          {htmlPreview.size.width.toFixed(0)} ×{" "}
-          {htmlPreview.size.height.toFixed(0)} px
+          {Math.round(viewportWidth)} × {Math.round(viewportHeight)} px
         </span>
         <span className="text-[10px] text-muted-foreground/70">
           Scale {(scaleFactor * 100).toFixed(0)}%

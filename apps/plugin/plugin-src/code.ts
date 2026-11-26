@@ -9,14 +9,30 @@ import {
 } from "backend";
 import { nodesToJSON } from "backend/src/altNodes/jsonNodeConversion";
 import { oldConvertNodesToAltNodes } from "backend/src/altNodes/oldAltConversion";
-import {
-  exportNodeAsPNG,
-  exportNodeAsPNGWithScale,
-} from "backend/src/common/images";
+import { nodeHasImageFill } from "backend/src/common/images";
 import { retrieveGenericSolidUIColors } from "backend/src/common/retrieveUI/retrieveColors";
 import { htmlCodeGenTextStyles } from "backend/src/html/htmlMain";
-import { zipSync } from "fflate";
+import { tailwindCodeGenTextStyles } from "backend/src/tailwind/tailwindMain";
 import {
+  collectProjectAssets,
+  downloadAssetDescriptor,
+  supportsCompiler,
+} from "backend/src/compiler/session";
+import { exportAsset, visibleSelection } from "backend/src/compiler/assets";
+import {
+  encodeHtmlFile,
+  prepareHtmlExport,
+} from "backend/src/compiler/htmlExport";
+import { normalizeSelection } from "backend/src/compiler/normalize";
+import { webGenerator } from "backend/src/compiler/web";
+import {
+  projectAssetDirectory,
+  projectAssetUrl,
+} from "backend/src/zipGenerator";
+import { generateAssetZip } from "backend/src/zipGenerator";
+import {
+  AssetDownloadMessage,
+  DownloadFormat,
   DownloadProjectFormat,
   PluginSettings,
   SettingWillChangeMessage,
@@ -28,6 +44,10 @@ export const defaultPluginSettings: PluginSettings = {
   framework: "HTML",
   showLayerNames: false,
   useOldPluginVersion2025: false,
+  designCompiler: false,
+  outputFormat: "framework",
+  embedDocumentImages: true,
+  linkGoogleFonts: false,
   responsiveRoot: false,
   roundTailwindValues: true,
   roundTailwindColors: true,
@@ -47,7 +67,7 @@ export const defaultPluginSettings: PluginSettings = {
 
 // A helper type guard to ensure the key belongs to the PluginSettings type
 function isKeyOfPluginSettings(key: string): key is keyof PluginSettings {
-  return key in defaultPluginSettings;
+  return Object.prototype.hasOwnProperty.call(defaultPluginSettings, key);
 }
 
 const getUserSettings = async () => {
@@ -79,68 +99,88 @@ const getUserSettings = async () => {
   return userPluginSettings;
 };
 
-const initSettings = async () => {
-  console.log("[DEBUG] initSettings - Initializing plugin settings");
-  await getUserSettings();
-  postSettingsChanged(userPluginSettings);
-  console.log("[DEBUG] initSettings - Calling safeRun with settings");
-  safeRun(userPluginSettings);
-};
-
-// Used to prevent running from happening again.
+let initialized = false;
 let isLoading = false;
 let isDownloadingProject = false;
-let rerunAfterDownload = false;
-const safeRun = async (settings: PluginSettings) => {
-  console.log(
-    "[DEBUG] safeRun - Called with isLoading =",
-    isLoading,
-    "selectionCount =",
-    figma.currentPage.selection.length,
-  );
-  if (isDownloadingProject) {
-    rerunAfterDownload = true;
+let assetOperations = 0;
+let revision = 0;
+let completedRevision = 0;
+let observedLayerIds = new Set<string>();
+
+async function refreshSelection() {
+  if (
+    !initialized ||
+    isLoading ||
+    isDownloadingProject ||
+    assetOperations ||
+    revision === completedRevision
+  )
     return;
+
+  isLoading = true;
+  const roots = [...figma.currentPage.selection];
+  const seen = new Set<string>();
+  const stack = [...roots];
+  while (stack.length && seen.size < 4000) {
+    const layer = stack.pop()!;
+    if (seen.has(layer.id)) continue;
+    seen.add(layer.id);
+    if ("children" in layer)
+      for (const child of layer.children) stack.push(child);
   }
+  for (const root of roots) {
+    for (
+      let node = root.parent;
+      node && node.type !== "PAGE";
+      node = node.parent
+    )
+      seen.add(node.id);
+  }
+  observedLayerIds = seen;
 
-  if (isLoading === false) {
-    try {
-      isLoading = true;
-      console.log("[DEBUG] safeRun - Starting run execution");
-      await run(settings);
-      console.log("[DEBUG] safeRun - Run execution completed");
-      // hack to make it not immediately set to false when complete. (executes on next frame)
-      setTimeout(() => {
-        console.log("[DEBUG] safeRun - Resetting isLoading to false");
-        isLoading = false;
-      }, 1);
-    } catch (e) {
-      console.log("[DEBUG] safeRun - Error caught in execution");
-      isLoading = false; // Make sure to reset the flag on error
-      if (e && typeof e === "object" && "message" in e) {
-        const error = e as Error;
-        console.log("error: ", error.stack);
-        figma.ui.postMessage({ type: "error", error: error.message });
-      } else {
-        // Handle non-standard errors or unknown error types
-        const errorMessage = String(e);
-        console.log("Unknown error: ", errorMessage);
-        figma.ui.postMessage({
-          type: "error",
-          error: errorMessage || "Unknown error occurred",
-        });
-      }
-
-      // Send a message to reset the UI state
-      figma.ui.postMessage({ type: "conversion-complete", success: false });
+  const current = revision;
+  const isCurrent = () => current === revision;
+  try {
+    await run({ ...userPluginSettings }, isCurrent);
+  } catch (error) {
+    if (isCurrent()) {
+      figma.ui.postMessage({ type: "error", error: errorText(error) });
     }
-  } else {
-    console.log(
-      "[DEBUG] safeRun - Skipping execution because isLoading =",
-      isLoading,
+  } finally {
+    completedRevision = current;
+    isLoading = false;
+    void refreshSelection();
+  }
+}
+
+const errorText = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
+
+function queueSelectionRefresh() {
+  revision += 1;
+  void refreshSelection();
+}
+
+function postAssetDownload(
+  bytes: Uint8Array,
+  fileName: string,
+  mimeType: string,
+  project = false,
+) {
+  if (bytes.byteLength > 10 * 1024 * 1024) {
+    throw new Error(
+      "Download exceeds the 10 MB message limit. Use a smaller selection or export scale.",
     );
   }
-};
+  const message: AssetDownloadMessage = {
+    type: "download-file",
+    bytes: Uint8Array.from(bytes).buffer,
+    fileName,
+    mimeType,
+    project,
+  };
+  figma.ui.postMessage(message);
+}
 
 type ExportedProjectImage = {
   name: string;
@@ -176,28 +216,6 @@ const getRootSelectionName = (selection: readonly SceneNode[]) => {
   );
 };
 
-const createAssetFileName = (
-  nodeId: string,
-  nodeName: string,
-  extension: "png" | "svg" = "png",
-) => {
-  const fallback = extension === "svg" ? "icon" : "image";
-  const cleanName = toKebab(nodeName) || fallback;
-  const suffix = nodeId.replace(/[^a-z0-9]+/gi, "-").replace(/(^-|-$)/g, "");
-  return `${cleanName}-${suffix}.${extension}`;
-};
-
-const isImageNode = (node: SceneNode): boolean => {
-  if ("fills" in node) {
-    const fills = node.fills;
-    if (fills && fills !== figma.mixed && Array.isArray(fills)) {
-      return fills.some((fill) => fill.type === "IMAGE");
-    }
-  }
-
-  return false;
-};
-
 const exportProjectAssets = async (
   selection: readonly SceneNode[],
   requiredNodeIds: ReadonlySet<string>,
@@ -211,28 +229,13 @@ const exportProjectAssets = async (
     }
 
     if (missingNodeIds.has(node.id)) {
-      if (!("exportAsync" in node)) {
-        throw new Error(
-          `Node ${node.name || node.id} cannot be exported as an asset.`,
-        );
-      }
-
-      if (isImageNode(node)) {
-        const hasChildren = "children" in node && node.children.length > 0;
-        const bytes = await exportNodeAsPNG(node, hasChildren);
-        assets.push({
-          bytes,
-          name: createAssetFileName(node.id, node.name, "png"),
-          nodeId: node.id,
-        });
-      } else {
-        const bytes = await node.exportAsync({ format: "SVG" });
-        assets.push({
-          bytes,
-          name: createAssetFileName(node.id, node.name, "svg"),
-          nodeId: node.id,
-        });
-      }
+      const format = nodeHasImageFill(node) ? "PNG" : "SVG";
+      const descriptor = downloadAssetDescriptor(node, format);
+      assets.push({
+        bytes: await exportAsset(node, descriptor),
+        name: descriptor.name,
+        nodeId: node.id,
+      });
       missingNodeIds.delete(node.id);
     }
 
@@ -289,6 +292,7 @@ const generateDownloadCode = async (
   const settings = {
     ...pluginSettings,
     embedImages: false,
+    embedVectors: false,
     imagePlaceholderMode: "asset" as const,
   };
   const isReactProject = format === "nextjs" || format === "vite";
@@ -312,6 +316,53 @@ const generateDownloadCode = async (
   return result?.html || "<div>Failed to generate HTML</div>";
 };
 
+const downloadHtmlDocument = async (
+  format: "single-html" | "separate-html" | "html-assets",
+) => {
+  const selection = visibleSelection(figma.currentPage.selection);
+  const { document, sources } = normalizeSelection(selection);
+  if (!document.roots.length)
+    throw new Error("Select a visible layer to export.");
+  const embed =
+    format === "single-html" &&
+    userPluginSettings.embedDocumentImages !== false;
+  const result = await prepareHtmlExport(
+    document,
+    sources,
+    embed,
+    format === "separate-html",
+    undefined,
+    userPluginSettings.linkGoogleFonts,
+  );
+  if (!result) return;
+  const fileName = getRootSelectionName(selection);
+  if (format === "single-html") {
+    postAssetDownload(
+      encodeHtmlFile(result.html),
+      `${fileName}.html`,
+      "text/html;charset=utf-8",
+      true,
+    );
+    return;
+  }
+  const files =
+    format === "html-assets"
+      ? result.assets
+      : {
+          "index.html": encodeHtmlFile(result.html),
+          "styles.css": encodeHtmlFile(result.css),
+          ...(embed ? {} : result.assets),
+        };
+  if (!Object.keys(files).length)
+    throw new Error("No separate assets are needed for this selection.");
+  postAssetDownload(
+    generateAssetZip(files),
+    `${fileName}-${format}.zip`,
+    "application/zip",
+    true,
+  );
+};
+
 const downloadProject = async (format: DownloadProjectFormat) => {
   if (!["html", "nextjs", "vite"].includes(format)) {
     throw new Error(`Invalid download format: ${format}.`);
@@ -324,26 +375,65 @@ const downloadProject = async (format: DownloadProjectFormat) => {
     );
   }
 
-  const selection = [...figma.currentPage.selection];
+  projectAssetDirectory(pluginSettings.customImagePath);
+  const selection = visibleSelection(figma.currentPage.selection);
   if (selection.length === 0) {
     throw new Error("Please select at least one layer to export.");
   }
 
-  const rawCode = await generateDownloadCode(selection, format, pluginSettings);
-  const requiredAssetNodeIds = extractProjectImageNodeIds(rawCode);
-  const assets = await exportProjectAssets(selection, requiredAssetNodeIds);
-  const code = replaceProjectImagePlaceholders(
-    rawCode,
-    assets,
-    format,
-    pluginSettings.customImagePath,
-  );
+  const maxRawAssetSizeBytes = 25 * 1024 * 1024;
+  let assets: ExportedProjectImage[];
+  let code: string;
+  let artifacts: Parameters<typeof generateProjectZip>[6];
+  if (supportsCompiler(pluginSettings)) {
+    const { document, sources } = normalizeSelection(selection);
+    const flatColors = new Map<string, string>();
+    assets = await collectProjectAssets(
+      document.assets,
+      sources,
+      document.diagnostics,
+      maxRawAssetSizeBytes,
+      flatColors,
+    );
+    const exported = new Map(assets.map((asset) => [asset.nodeId, asset.name]));
+    code = webGenerator({
+      jsx: format !== "html",
+      tailwind: pluginSettings.framework === "Tailwind",
+    }).render(document, {
+      assetColor: (asset) => flatColors.get(asset.id),
+      assetUrl: (asset) => {
+        const name = exported.get(asset.id);
+        return name
+          ? projectAssetUrl(name, format, pluginSettings.customImagePath)
+          : undefined;
+      },
+    });
+    artifacts = {
+      tokens: document.tokens,
+      diagnostics: [...new Set(document.diagnostics)],
+    };
+  } else {
+    const rawCode = await generateDownloadCode(
+      selection,
+      format,
+      pluginSettings,
+    );
+    assets = await exportProjectAssets(
+      selection,
+      extractProjectImageNodeIds(rawCode),
+    );
+    code = replaceProjectImagePlaceholders(
+      rawCode,
+      assets,
+      format,
+      pluginSettings.customImagePath,
+    );
+  }
   const rootName = getRootSelectionName(selection);
   const rawAssetSize = assets.reduce(
     (sum, asset) => sum + asset.bytes.byteLength,
     0,
   );
-  const maxRawAssetSizeBytes = 25 * 1024 * 1024;
   if (rawAssetSize > maxRawAssetSizeBytes) {
     throw new Error(
       `Assets are too large (${Math.round(rawAssetSize / 1024 / 1024)}MB). Try selecting fewer assets or smaller components.`,
@@ -356,6 +446,7 @@ const downloadProject = async (format: DownloadProjectFormat) => {
     format,
     rootName,
     pluginSettings.customImagePath,
+    artifacts,
   );
 
   const maxMessageSizeBytes = 10 * 1024 * 1024;
@@ -381,45 +472,58 @@ const downloadProject = async (format: DownloadProjectFormat) => {
 const standardMode = async () => {
   console.log("[DEBUG] standardMode - Starting standard mode initialization");
   figma.showUI(__html__, { width: 450, height: 700, themeColors: true });
-  let initialized = false;
-  const initializeOnce = async () => {
-    if (initialized) {
-      return;
-    }
-    initialized = true;
-    await initSettings();
+  let settingsReady: Promise<void> | undefined;
+  figma.on("selectionchange", queueSelectionRefresh);
+  figma.on("currentpagechange", queueSelectionRefresh);
+  // Current-page node events avoid loading unrelated pages solely to refresh the preview.
+  let observedPage = figma.currentPage;
+  const onEdit = ({ nodeChanges }: NodeChangeEvent) => {
+    const selected = new Set(figma.currentPage.selection.map(({ id }) => id));
+    if (!selected.size) return;
+    const affectsSelection = nodeChanges.some(({ node }) => {
+      if (observedLayerIds.has(node.id)) return true;
+      if (node.removed) return false;
+      for (
+        let current: BaseNode | null = node;
+        current;
+        current = current.parent
+      ) {
+        if (selected.has(current.id)) return true;
+      }
+      return false;
+    });
+    if (affectsSelection) queueSelectionRefresh();
   };
-
-  // Listen for selection changes
-  figma.on("selectionchange", () => {
-    console.log(
-      "[DEBUG] selectionchange event - New selection count:",
-      figma.currentPage.selection.length,
-    );
-    safeRun(userPluginSettings);
-  });
-
-  // Listen for page changes
-  figma.loadAllPagesAsync();
-  figma.on("documentchange", () => {
-    console.log("[DEBUG] documentchange event triggered");
-    // Node: This was causing an infinite load when you try to export a background image from a group that contains children.
-    // The reason for this is that the code will temporarily hide the children of the group in order to export a clean image
-    // then restores the visibility of the children. This constitutes a document change so it's restarting the whole conversion.
-    // In order to stop this, we disable safeRun() when doing conversions (while isLoading === true).
-    safeRun(userPluginSettings);
+  observedPage.on("nodechange", onEdit);
+  figma.on("currentpagechange", () => {
+    observedPage.off("nodechange", onEdit);
+    observedPage = figma.currentPage;
+    observedPage.on("nodechange", onEdit);
   });
 
   figma.ui.onmessage = async (msg) => {
+    if (!msg || typeof msg.type !== "string") return;
     console.log(
       "[DEBUG] figma.ui.onmessage",
       msg?.type ? `type=${msg.type}` : "unknown type",
     );
 
     if (msg.type === "ui-ready") {
-      await initializeOnce();
-    } else if (msg.type === "download-project") {
-      if (isLoading) {
+      settingsReady ??= getUserSettings()
+        .catch(() => {
+          userPluginSettings = { ...defaultPluginSettings };
+        })
+        .then(() => {
+          initialized = true;
+          postSettingsChanged(userPluginSettings);
+          queueSelectionRefresh();
+        });
+      await settingsReady;
+      return;
+    }
+    if (!initialized) return;
+    if (msg.type === "download-project") {
+      if (isLoading || assetOperations) {
         figma.ui.postMessage({
           type: "project-download-error",
           error: "Please wait for the current conversion to finish.",
@@ -437,7 +541,14 @@ const standardMode = async () => {
 
       isDownloadingProject = true;
       try {
-        await downloadProject(msg.format as DownloadProjectFormat);
+        const format = msg.format as DownloadFormat;
+        if (
+          format === "single-html" ||
+          format === "separate-html" ||
+          format === "html-assets"
+        )
+          await downloadHtmlDocument(format);
+        else await downloadProject(format);
       } catch (error) {
         console.error("Download project failed:", error);
         figma.ui.postMessage({
@@ -448,126 +559,96 @@ const standardMode = async () => {
         });
       } finally {
         isDownloadingProject = false;
-        if (rerunAfterDownload) {
-          rerunAfterDownload = false;
-          void safeRun(userPluginSettings);
-        }
+        void refreshSelection();
       }
-    } else if (msg.type === "export-single-asset") {
-      try {
-        const { nodeId, scale = 1, format = "PNG", fileName } = msg;
-        const node = (await figma.getNodeByIdAsync(nodeId)) as SceneNode;
-        if (!node || !("exportAsync" in node)) {
-          figma.ui.postMessage({
-            type: "asset-export-error",
-            error: "Selected asset could not be found.",
-          });
-          return;
-        }
-
-        let bytes: Uint8Array;
-        let mimeType = "image/png";
-        const cleanName = toKebab(
-          node.name || (format === "SVG" ? "icon" : "image"),
-        );
-        const defaultExt = format.toLowerCase();
-        const resolvedName =
-          fileName ||
-          `${cleanName}-${node.id.replace(/[^a-z0-9]/gi, "-")}${
-            scale > 1 && format !== "SVG" ? `@${scale}x` : ""
-          }.${defaultExt}`;
-
-        if (format === "SVG") {
-          bytes = await node.exportAsync({ format: "SVG" });
-          mimeType = "image/svg+xml";
-        } else {
-          const hasChildren = "children" in node && node.children.length > 0;
-          if (hasChildren) {
-            bytes = await exportNodeAsPNGWithScale(node, true, scale);
-          } else {
-            bytes = await node.exportAsync({
-              format: "PNG",
-              constraint: { type: "SCALE", value: scale },
-            });
-          }
-          mimeType = "image/png";
-        }
-
-        const buffer = bytes.buffer.slice(
-          bytes.byteOffset,
-          bytes.byteOffset + bytes.byteLength,
-        );
-
-        figma.ui.postMessage({
-          type: "download-file",
-          bytes: buffer,
-          fileName: resolvedName,
-          mimeType,
-        });
-      } catch (err: any) {
-        console.error("Single asset export failed:", err);
+    } else if (
+      msg.type === "export-single-asset" ||
+      msg.type === "export-multiple-assets"
+    ) {
+      if (assetOperations || isDownloadingProject || isLoading) {
         figma.ui.postMessage({
           type: "asset-export-error",
-          error: `Export failed: ${err.message}`,
+          error: "Wait for the current conversion or export to finish.",
         });
+        return;
       }
-    } else if (msg.type === "export-multiple-assets") {
+      assetOperations += 1;
       try {
-        const { items, zipFileName = "exported-assets.zip" } = msg;
-        const files: Record<string, Uint8Array> = {};
-
+        const single = msg.type === "export-single-asset";
+        const items: unknown = single ? [msg] : msg.items;
+        if (!Array.isArray(items) || !items.length || items.length > 4000)
+          throw new Error("Select between 1 and 4,000 assets.");
+        const files: Record<string, Uint8Array> = Object.create(null);
+        let size = 0;
         for (const item of items) {
-          const node = (await figma.getNodeByIdAsync(item.nodeId)) as SceneNode;
-          if (node && "exportAsync" in node) {
-            if (item.format === "SVG") {
-              const bytes = await node.exportAsync({ format: "SVG" });
-              files[item.fileName] = bytes;
-            } else {
-              const hasChildren =
-                "children" in node && node.children.length > 0;
-              let bytes: Uint8Array;
-              if (hasChildren) {
-                bytes = await exportNodeAsPNGWithScale(
-                  node,
-                  true,
-                  item.scale || 1,
-                );
-              } else {
-                bytes = await node.exportAsync({
-                  format: "PNG",
-                  constraint: { type: "SCALE", value: item.scale || 1 },
-                });
-              }
-              files[item.fileName] = bytes;
-            }
+          if (
+            !item ||
+            typeof item.nodeId !== "string" ||
+            !["PNG", "SVG"].includes(item.format)
+          )
+            throw new Error("Invalid asset request.");
+          const scale = item.scale ?? 1;
+          if (!Number.isInteger(scale) || scale < 1 || scale > 4)
+            throw new Error("Asset scale must be between 1× and 4×.");
+          const node = await figma.getNodeByIdAsync(item.nodeId);
+          if (!node || node.type === "DOCUMENT" || node.type === "PAGE")
+            throw new Error(`Asset ${item.nodeId} could not be found.`);
+          const descriptor = downloadAssetDescriptor(node, item.format);
+          const name =
+            scale > 1 && item.format === "PNG"
+              ? descriptor.name.replace(/\.png$/, `@${scale}x.png`)
+              : descriptor.name;
+          const bytes = await exportAsset(node, descriptor, scale);
+          if (single) {
+            postAssetDownload(
+              bytes,
+              name,
+              item.format === "SVG" ? "image/svg+xml" : "image/png",
+            );
+            break;
           }
+          size += bytes.byteLength;
+          if (size > 25 * 1024 * 1024)
+            throw new Error(
+              "Asset selection exceeds 25 MB. Reduce the export scale or select fewer layers.",
+            );
+          files[name] = bytes;
         }
-
-        const zipData = zipSync(files, { level: 6 });
-        const buffer = zipData.buffer.slice(
-          zipData.byteOffset,
-          zipData.byteOffset + zipData.byteLength,
-        );
-
-        figma.ui.postMessage({
-          type: "download-file",
-          bytes: buffer,
-          fileName: zipFileName,
-          mimeType: "application/zip",
-        });
-      } catch (err: any) {
-        console.error("Multiple assets export failed:", err);
+        if (!single)
+          postAssetDownload(
+            generateAssetZip(files),
+            "exported-assets.zip",
+            "application/zip",
+          );
+      } catch (error) {
         figma.ui.postMessage({
           type: "asset-export-error",
-          error: `Export failed: ${err.message}`,
+          error: errorText(error),
         });
+      } finally {
+        assetOperations -= 1;
+        void refreshSelection();
       }
     } else if (msg.type === "pluginSettingWillChange") {
       const { key, value } = msg as SettingWillChangeMessage<unknown>;
       console.log(`[DEBUG] Setting changed: ${key} = ${value}`);
-      (userPluginSettings as any)[key] = value;
-      figma.clientStorage.setAsync("userPluginSettings", userPluginSettings);
-      safeRun(userPluginSettings);
+      if (
+        !isKeyOfPluginSettings(key) ||
+        typeof value !== typeof defaultPluginSettings[key]
+      )
+        return;
+      if (
+        key === "outputFormat" &&
+        value !== "framework" &&
+        value !== "single-html" &&
+        value !== "separate-html"
+      )
+        return;
+      userPluginSettings = { ...userPluginSettings, [key]: value };
+      void figma.clientStorage
+        .setAsync("userPluginSettings", userPluginSettings)
+        .catch(console.error);
+      queueSelectionRefresh();
     } else if (msg.type === "get-selection-json") {
       console.log("[DEBUG] get-selection-json message received");
 
@@ -645,7 +726,25 @@ const codegenMode = async () => {
         `[DEBUG] codegen.generate - Language: ${language}, Node: id=${node.id}, type=${node.type}`,
       );
 
-      const convertedSelection = await nodesToJSON([node], userPluginSettings);
+      if (
+        userPluginSettings.designCompiler &&
+        ["html", "html_jsx", "tailwind", "tailwind_jsx"].includes(language)
+      ) {
+        const { document } = normalizeSelection([node]);
+        const code = webGenerator({
+          jsx: language.endsWith("_jsx"),
+          tailwind: language.startsWith("tailwind"),
+        }).render(document, {
+          assetUrl: (asset) =>
+            `${projectAssetDirectory(userPluginSettings.customImagePath)}/${asset.name}`,
+        });
+        return [{ title: "Design Compiler", code, language: "HTML" }];
+      }
+
+      const convertedSelection = await getConvertedSelectionForDownload(
+        [node],
+        { ...userPluginSettings, useOldPluginVersion2025: false },
+      );
       console.log(
         "[DEBUG] codegen.generate - Converted selection count:",
         convertedSelection.length,

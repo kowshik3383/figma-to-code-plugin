@@ -71,10 +71,7 @@ export const renderAndAttachSVG = async (node: any) => {
     }
 
     try {
-      const rawBytesOrString = await exportAsyncProxy<Uint8Array | string>(
-        node,
-        { format: "SVG" as any },
-      );
+      const rawBytesOrString = await exportAsyncProxy(node, { format: "SVG" });
       const svg = uint8ArrayToString(rawBytesOrString);
 
       // Make SVG responsive by ensuring width="100%" and height="100%" while retaining viewBox
